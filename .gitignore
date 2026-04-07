@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out/
+src-tauri/target/
+src-tauri/gen/
+.env
+.env.*
+.DS_Store
+*.dmg
+.claude/
