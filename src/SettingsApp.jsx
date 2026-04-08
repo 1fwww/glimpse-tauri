@@ -4,11 +4,13 @@ import './app.css'
 export default function SettingsApp() {
   const [apiKeys, setApiKeys] = useState({ ANTHROPIC_API_KEY: '', GEMINI_API_KEY: '', hasAnyKey: false, isInvite: false })
   const [prefs, setPrefs] = useState({ launchAtLogin: false, saveLocation: 'ask', savePath: '' })
-  const [editingKey, setEditingKey] = useState(null) // 'anthropic' | 'gemini' | null
+  const [editingKey, setEditingKey] = useState(null)
   const [keyInput, setKeyInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const [keySaved, setKeySaved] = useState(null) // provider id that was just saved
+  const [keySaved, setKeySaved] = useState(null)
   const [keyError, setKeyError] = useState('')
+  const [deletingKey, setDeletingKey] = useState(null)
+  const [theme, setTheme] = useState(() => localStorage.getItem('glimpse-theme') || 'system')
 
   useEffect(() => {
     loadData()
@@ -23,7 +25,22 @@ export default function SettingsApp() {
 
   const handleDeleteKey = async (provider) => {
     await window.electronAPI?.deleteApiKey(provider)
+    setDeletingKey(null)
     loadData()
+  }
+
+  const handleThemeChange = (value) => {
+    setTheme(value)
+    localStorage.setItem('glimpse-theme', value)
+    // Apply theme class to document
+    const root = document.documentElement
+    root.classList.remove('theme-light', 'theme-dark')
+    if (value === 'light') root.classList.add('theme-light')
+    else if (value === 'dark') root.classList.add('theme-dark')
+    else {
+      // System: follow prefers-color-scheme
+      if (window.matchMedia('(prefers-color-scheme: light)').matches) root.classList.add('theme-light')
+    }
   }
 
   const handleSaveKey = async (provider) => {
@@ -98,7 +115,7 @@ export default function SettingsApp() {
     <div className="settings-app">
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
-        <button className="settings-close" onClick={handleClose}>
+        <button className="settings-close" onClick={handleClose} aria-label="Close settings">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -151,13 +168,19 @@ export default function SettingsApp() {
                       </div>
                       {keyError && <div className="settings-key-error">{keyError}</div>}
                     </div>
+                  ) : deletingKey === p.id ? (
+                    <div className="settings-delete-confirm">
+                      <span className="settings-delete-text">Delete this key?</span>
+                      <button className="settings-btn-sm danger" onClick={() => handleDeleteKey(p.id)}>Delete</button>
+                      <button className="settings-btn-sm" onClick={() => setDeletingKey(null)}>Keep</button>
+                    </div>
                   ) : (
                     <div className="settings-key-actions">
                       <button className="settings-btn-sm" onClick={() => { setEditingKey(p.id); setKeyInput(''); setKeyError('') }}>
                         {apiKeys[p.keyField] ? 'Update' : 'Add'}
                       </button>
                       {apiKeys[p.keyField] && (
-                        <button className="settings-btn-sm danger" onClick={() => handleDeleteKey(p.id)}>Delete</button>
+                        <button className="settings-btn-sm danger" onClick={() => setDeletingKey(p.id)}>Delete</button>
                       )}
                     </div>
                   )}
@@ -172,6 +195,15 @@ export default function SettingsApp() {
           <h2 className="settings-section-title">Preferences</h2>
 
           <div className="settings-pref-row">
+            <span className="settings-pref-label">Appearance</span>
+            <div className="settings-btn-group">
+              <button className={`settings-btn-group-item ${theme === 'light' ? 'active' : ''}`} onClick={() => handleThemeChange('light')}>Light</button>
+              <button className={`settings-btn-group-item ${theme === 'dark' ? 'active' : ''}`} onClick={() => handleThemeChange('dark')}>Dark</button>
+              <button className={`settings-btn-group-item ${theme === 'system' ? 'active' : ''}`} onClick={() => handleThemeChange('system')}>System</button>
+            </div>
+          </div>
+
+          <div className="settings-pref-row">
             <span className="settings-pref-label">Launch at login</span>
             <button
               className={`settings-toggle ${prefs.launchAtLogin ? 'on' : ''}`}
@@ -183,15 +215,15 @@ export default function SettingsApp() {
 
           <div className="settings-pref-row">
             <span className="settings-pref-label">Save screenshots to</span>
-            <div className="settings-save-options">
+            <div className="settings-btn-group">
               <button
-                className={`settings-btn-sm ${prefs.saveLocation === 'ask' ? 'active' : ''}`}
+                className={`settings-btn-group-item ${prefs.saveLocation === 'ask' ? 'active' : ''}`}
                 onClick={() => handleSaveLocationChange('ask')}
               >
                 Ask each time
               </button>
               <button
-                className={`settings-btn-sm ${prefs.saveLocation === 'folder' ? 'active' : ''}`}
+                className={`settings-btn-group-item ${prefs.saveLocation === 'folder' ? 'active' : ''}`}
                 onClick={() => handleSaveLocationChange('folder')}
               >
                 {prefs.saveLocation === 'folder' && prefs.savePath
@@ -212,11 +244,16 @@ export default function SettingsApp() {
           <div className="settings-shortcut-row">
             <div className="settings-shortcut-info">
               <span className="settings-pref-label">Text chat</span>
-              <span className="settings-shortcut-hint">Tip: Select text, then press to ask about it</span>
+              <span className="settings-shortcut-hint">Select text first, then press</span>
             </div>
             <span className="settings-shortcut-keys"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>X</kbd></span>
           </div>
+          <span className="settings-shortcuts-note">Customizable shortcuts coming soon</span>
         </div>
+      </div>
+      <div className="settings-footer">
+        <span className="settings-version">Glimpse v1.0</span>
+        <button className="settings-esc-btn" onClick={handleClose}><kbd>Esc</kbd> to close</button>
       </div>
     </div>
   )

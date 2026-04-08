@@ -58,15 +58,12 @@ export default function ApiKeySetup({ onDone, onSkip }) {
   return (
     <div className="api-key-setup">
       <div className="api-key-header">
-        <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-        </svg>
-        <h2>Glimpse Chat Setup</h2>
+        <h2>Connect to AI</h2>
       </div>
 
       {mode === 'keys' ? (
         <>
-          <p className="api-key-desc">Add any API key to get started. Keys are stored locally.</p>
+          <p className="api-key-desc">{savedProviders.length > 0 ? 'Add more keys or start chatting.' : 'Keys stay on your device.'}</p>
 
           {selectedProvider === null ? (
             <>
@@ -109,24 +106,25 @@ export default function ApiKeySetup({ onDone, onSkip }) {
                   spellCheck={false}
                   autoFocus
                 />
-                <span className="api-key-hint">
-                  <a href="#" onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url) }}>
-                    Get key
-                  </a>
-                </span>
+                {!error && (
+                  <span className="api-key-hint">
+                    <a href="#" onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url) }}>
+                      Get key
+                    </a>
+                  </span>
+                )}
               </div>
 
-              {error && <div className="api-key-error">{error}</div>}
+              {error && <div className="api-key-error">Invalid key. <a href="#" onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url) }}>Get a new one</a></div>}
 
               <button className="api-key-save" onClick={handleSave} disabled={!hasInput || saving}>
-                {saving ? 'Verifying...' : 'Save & Continue'}
+                {saving ? 'Verifying...' : 'Connect'}
               </button>
             </div>
           )}
         </>
       ) : (
         <>
-          <p className="api-key-desc">Enter your invite code to get started.</p>
           <div className="api-key-field">
             <input
               type="text"
@@ -136,25 +134,26 @@ export default function ApiKeySetup({ onDone, onSkip }) {
               onKeyDown={handleKeyDown}
               spellCheck={false}
               autoFocus
+              style={{ fontFamily: 'var(--font-display)' }}
             />
           </div>
 
           {error && <div className="api-key-error">{error}</div>}
 
           <button className="api-key-save" onClick={handleSave} disabled={!hasInput || saving}>
-            {saving ? 'Verifying...' : 'Save & Continue'}
+            {saving ? 'Verifying...' : 'Connect'}
           </button>
         </>
       )}
 
       <div className="api-key-footer">
         <button className="api-key-link" onClick={switchMode}>
-          {mode === 'keys' ? 'Invite code' : 'Use API keys'}
+          {mode === 'keys' ? 'Use invite code' : 'Use API keys'}
         </button>
         {onSkip && (
           <>
             <span className="api-key-dot">·</span>
-            <button className="api-key-link" onClick={onSkip}>Maybe later</button>
+            <button className="api-key-link" onClick={onSkip}>Skip for now</button>
           </>
         )}
       </div>

@@ -143,3 +143,9 @@ pkill -f "[Gg]limpse"; lsof -ti:5173 | xargs kill -9
 3. **`activateIgnoringOtherApps`** — Does NOT work for Accessory apps. Does NOT work for bare binaries in dev mode.
 4. **`w.close()` is async** — `get_webview_window()` may still return Some. Prefer hiding over close+recreate.
 5. **Window levels**: CGShieldingWindowLevel (2147483628) for overlay. Level 3 (floating) for chat.
+
+## TODO
+
+- [ ] Screenshot → Pinned chat transition not smooth enough (visual jump/flicker during pin)
+- [ ] Screenshot selection drag smoothness (mousemove triggers full React re-render with large image)
+- [ ] Fullscreen overlay may still appear on wrong Space after hide+delayed-close prewarm

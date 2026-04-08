@@ -7,9 +7,8 @@ import ApiKeySetup from './ApiKeySetup'
 const GlimpseIcon = ({ size = 20 }) => (
   <svg viewBox="60 140 420 280" width={size} height={Math.round(size * 280 / 420)}>
     {/* Eyebrow — first path, targeted by CSS animation */}
-    <path d="M104.539 204.375C153.938 173.009 385 145.971 437.19 251.313" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
-    {/* Eye + spiral */}
-    <path d="M262 374.28C230.253 373.396 178.271 361.552 128 321.247C177.587 275.666 316.314 196.628 390.289 269.765C467.605 346.206 348.474 380.522 321.426 374.28C237.073 368.093 260.551 273.518 321.426 278.821C382.301 284.124 362.664 347.764 321.426 331.854" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
+    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
   </svg>
 )
 
@@ -240,9 +239,14 @@ export default function ChatPanel({
 
   // After welcome animation, auto-send pending question (skip re-adding user msg)
   useEffect(() => {
+    if (!showWelcome && pendingQuestion.current && availableProviders.length === 0) {
+      // Keys saved but no providers available (e.g. dev mode without env vars)
+      pendingQuestion.current = null
+      setMessages(prev => [...prev, { role: 'assistant', text: 'No API keys found. Please add a key in Settings.' }])
+      return
+    }
     if (!showWelcome && pendingQuestion.current && availableProviders.length > 0) {
       if (!provider || !modelId) {
-        // Providers loaded but no model selected yet — wait for next render
         return
       }
       const q = pendingQuestion.current
@@ -606,7 +610,7 @@ export default function ChatPanel({
 
   return (
     <div
-      className={`chat-panel ${isNewThread ? 'chat-panel-new' : ''} ${isPinned ? 'chat-panel-pinned' : ''}`}
+      className={`chat-panel ${isNewThread ? 'chat-panel-new' : ''} ${isPinned ? 'chat-panel-pinned pinned-panel' : ''}`}
       style={panelStyle}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -619,7 +623,7 @@ export default function ChatPanel({
       {/* Header — drag handle */}
       <div className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
         <span
-          className={`glimpse-icon-fixed ${(isLoading || eyebrowWiggle) ? 'glimpse-loading' : ''}`}
+          className={`glimpse-icon-fixed ${eyebrowWiggle ? 'glimpse-loading' : ''}`}
           onClick={(e) => {
             e.stopPropagation()
             if (!isLoading) {
@@ -629,7 +633,7 @@ export default function ChatPanel({
           }}
           style={{ cursor: 'pointer' }}
         >
-          <GlimpseIcon size={28} />
+          <GlimpseIcon size={24} />
         </span>
         <div className="chat-header-info" style={{ position: 'relative' }}>
           <button
@@ -669,6 +673,7 @@ export default function ChatPanel({
           <button
             className="chat-header-new"
             onClick={onNewThread}
+            aria-label="New chat"
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M5 12h14" />
@@ -676,17 +681,21 @@ export default function ChatPanel({
           </button>
         </Tooltip>
         {(onTogglePin || onPin) && (
+          <>
+          <div className="chat-header-sep" />
           <Tooltip text={isPinned ? 'Unpin' : 'Pin to screen'}>
             <button
               className={`chat-header-pin ${isPinned ? 'pinned' : ''}`}
               onClick={onTogglePin || (() => onPin({ screenshotAttached }))}
               disabled={isLoading}
+              aria-label={isPinned ? 'Unpin' : 'Pin to screen'}
             >
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 17v5" /><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z" />
               </svg>
             </button>
           </Tooltip>
+          </>
         )}
       </div>
 
@@ -705,15 +714,21 @@ export default function ChatPanel({
             setShowApiKeySetup(false)
             if (refreshProviders) await refreshProviders()
             setShowWelcome(true)
-            setEyebrowWiggle(true)
             setTimeout(() => {
               setShowWelcome(false)
-              setEyebrowWiggle(false)
-            }, 2500)
+            }, 4500)
           }} />
         ) : showWelcome ? (
           <div className="api-key-welcome">
-            <span className="glimpse-icon-fixed glimpse-loading">
+            <span className="glimpse-icon-fixed logo-draw-only" ref={(el) => {
+              if (el) {
+                setTimeout(() => {
+                  el.classList.remove('logo-draw-only')
+                  void el.offsetWidth
+                  el.classList.add('logo-draw-only')
+                }, 1800)
+              }
+            }}>
               <GlimpseIcon size={32} />
             </span>
             <span>Key added. Happy chatting!</span>
@@ -754,13 +769,20 @@ export default function ChatPanel({
                               >{children}</code>
                             )
                           }
+                          const lang = className?.replace('language-', '') || ''
                           return (
                             <div className="code-block-wrapper">
-                              <button className="code-block-copy" onClick={() => {
-                                navigator.clipboard.writeText(text)
-                                const btn = document.activeElement
-                                if (btn) { btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Copy' }, 800) }
-                              }}>Copy</button>
+                              <div className="code-block-header">
+                                <span className="code-block-lang">{lang}</span>
+                                <button className="code-block-copy" onClick={(e) => {
+                                  navigator.clipboard.writeText(text)
+                                  const btn = e.currentTarget
+                                  btn.classList.add('copied')
+                                  setTimeout(() => btn.classList.remove('copied'), 800)
+                                }} aria-label="Copy code">
+                                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                </button>
+                              </div>
                               <code className={className}>{children}</code>
                             </div>
                           )
@@ -778,9 +800,11 @@ export default function ChatPanel({
                                 if (text) {
                                   navigator.clipboard.writeText(text)
                                   const btn = ref.current?.querySelector('.bq-copy-btn')
-                                  if (btn) { btn.textContent = '✓'; btn.classList.add('bq-copied'); setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('bq-copied') }, 800) }
+                                  if (btn) { btn.classList.add('bq-copied'); setTimeout(() => btn.classList.remove('bq-copied'), 800) }
                                 }
-                              }}>Copy</button>
+                              }} aria-label="Copy text">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                              </button>
                             </blockquote>
                           )
                         },
@@ -803,7 +827,15 @@ export default function ChatPanel({
               })}
               {isLoading && (
                 <div className="chat-msg assistant" ref={lastAssistantRef}>
-                  <div className="thinking-text">thinking...</div>
+                  <div className="thinking">
+                    <div className="glimpsing-eye">
+                      <svg viewBox="60 140 420 280" width="16" height="11">
+                        <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round"/>
+                        <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <span className="glimpsing-text">Glimpsing...</span>
+                  </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -835,7 +867,7 @@ export default function ChatPanel({
               </svg>
               <span>Screenshot attached</span>
               {onDismissScreenshot && (
-                <button className="attachment-dismiss" onClick={() => { onDismissScreenshot(); setTimeout(() => inputRef.current?.focus(), 50) }}>×</button>
+                <button className="attachment-dismiss" onClick={() => { onDismissScreenshot(); setTimeout(() => inputRef.current?.focus(), 50) }} aria-label="Remove screenshot">×</button>
               )}
             </div>
           )}
@@ -854,7 +886,7 @@ export default function ChatPanel({
             rows={2}
             disabled={showApiKeySetup}
           />
-          <button className="chat-send-arrow" onClick={() => sendMessage()} disabled={isLoading || (!input.trim() && !textContext && !(screenshotAttached && croppedImage)) || showApiKeySetup}>
+          <button className="chat-send-arrow" onClick={() => sendMessage()} disabled={isLoading || (!input.trim() && !textContext && !(screenshotAttached && croppedImage)) || showApiKeySetup} aria-label="Send message">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 19V5M5 12l7-7 7 7" />
             </svg>
@@ -867,6 +899,7 @@ export default function ChatPanel({
         <Tooltip text="Settings">
           <button
             className="thread-action-settings"
+            aria-label="Settings"
             onClick={() => {
               const panel = document.querySelector('.chat-panel')
               const r = panel?.getBoundingClientRect()

@@ -11,12 +11,11 @@ const tools = [
 ]
 
 const colors = [
-  '#e5243a', // red — deeper, more saturated
-  '#e07800', // orange
-  '#d4a800', // yellow — less bright, still visible
-  '#1aab42', // green
-  '#0062e0', // blue
-  '#9333cf', // purple
+  '#DC3545', // red
+  '#E08700', // amber
+  '#06B6D4', // cyan
+  '#1E40AF', // blue
+  '#EC4899', // pink
   '#000000', // black
   '#ffffff', // white
 ]
@@ -212,7 +211,7 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
           onClick={clearAll}
           onMouseEnter={(e) => { setTooltip('Clear all annotations'); setTooltipX(e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2) }}
         >
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.5px' }}>RESET</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '11px' }}>Reset</span>
         </button>
 
         <span className="edit-toolbar-sep" />
@@ -280,8 +279,8 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
       >
         {chatMinimized ? (
           <svg viewBox="60 140 420 280" width="30" height="20">
-            <path d="M104.539 204.375C153.938 173.009 385 145.971 437.19 251.313" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
-            <path d="M262 374.28C230.253 373.396 178.271 361.552 128 321.247C177.587 275.666 316.314 196.628 390.289 269.765C467.605 346.206 348.474 380.522 321.426 374.28C237.073 368.093 260.551 273.518 321.426 278.821C382.301 284.124 362.664 347.764 321.426 331.854" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
+            <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+            <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
           </svg>
         ) : (
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none">

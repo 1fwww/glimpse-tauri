@@ -40,13 +40,13 @@ pub fn create_welcome_window(app: &AppHandle) -> Result<(), Box<dyn std::error::
             let s = m.scale_factor();
             let sw = m.size().width as f64 / s;
             let sh = m.size().height as f64 / s;
-            ((sw - 420.0) / 2.0, (sh - 480.0) / 2.0)
+            ((sw - 400.0) / 2.0, (sh - 510.0) / 2.0)
         })
         .unwrap_or((500.0, 300.0));
 
     let win = WebviewWindowBuilder::new(app, "welcome", WebviewUrl::App("index.html#welcome".into()))
         .title("Welcome to Glimpse")
-        .inner_size(420.0, 480.0)
+        .inner_size(400.0, 510.0)
         .position(x, y)
         .resizable(false)
         .decorations(false)
