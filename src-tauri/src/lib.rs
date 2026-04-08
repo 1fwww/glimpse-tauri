@@ -144,12 +144,36 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
         return;
     }
 
-    // Hide all our windows so they don't appear in screenshot
-    let has_visible = app.get_webview_window("home").is_some()
-        || app.get_webview_window("chat").is_some()
-        || app.get_webview_window("settings").is_some()
-        || app.get_webview_window("overlay").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
+    // Check which windows are actually visible on the current Space
+    let is_vis = |label: &str| -> bool {
+        app.get_webview_window(label).map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
+    };
+    let has_visible = is_vis("home") || is_vis("chat") || is_vis("settings") || is_vis("overlay");
     eprintln!("[Screenshot] triggered, has_visible={}", has_visible);
+
+    // Switch to Accessory policy + refresh overlay's collection behavior
+    // This allows overlay to appear on fullscreen Spaces
+    if !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        let app2 = app.clone();
+        let ow_ref = app.get_webview_window("overlay");
+        if let Some(ow) = ow_ref {
+            let ow2 = ow.clone();
+            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done2 = done.clone();
+            let _ = ow.run_on_main_thread(move || {
+                app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                // Refresh collection behavior under new policy so prewarm works on fullscreen
+                native_mac::set_visible_on_fullscreen(&ow2, true);
+                native_mac::set_window_level_screen_saver(&ow2);
+                done2.store(true, std::sync::atomic::Ordering::SeqCst);
+            });
+            for _ in 0..50 {
+                if done.load(std::sync::atomic::Ordering::SeqCst) { break; }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            IS_ACCESSORY.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
 
     let app_clone = app.clone();
     std::thread::spawn(move || {
@@ -185,21 +209,16 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                     let _ = w.hide();
                 }
             }
-            std::thread::sleep(std::time::Duration::from_millis(300));
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
-        // Capture and get window bounds simultaneously
-        let capture_result = capture::screenshot::capture_screen_to_file();
-        let window_bounds = capture::windows::get_window_bounds();
+        // Capture screen and get window bounds in parallel
+        let bounds_handle = std::thread::spawn(|| capture::windows::get_window_bounds());
+        let capture_result = capture::screenshot::capture_screen_to_memory();
+        let window_bounds = bounds_handle.join().unwrap_or_default();
 
         match capture_result {
-            Ok((file_path, display_info)) => {
+            Ok((data_url, display_info)) => {
                 let offset = serde_json::json!({"x": 0, "y": 0});
-
-                // Convert file to data URL
-                let data = std::fs::read(&file_path)
-                    .map_err(|e| format!("Failed to read capture: {}", e)).unwrap();
-                let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
-                let data_url = format!("data:image/jpeg;base64,{}", b64);
 
                 let payload = serde_json::json!({
                     "dataUrl": data_url,
@@ -238,17 +257,20 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                     let _ = w.emit("screen-captured", &payload);
                     let _ = w.show();
                     let _ = w.set_focus();
+                    // Install ESC global monitor so ESC works before selection
+                    native_mac::install_esc_monitor(app_clone.clone());
                 } else {
                     eprintln!("[Screenshot] no pre-warm, creating fresh overlay");
                     let _ = windows::create_overlay_window(&app_clone, &display_info);
-                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    // Wait for webview to load (fresh overlay, no prewarm)
+                    std::thread::sleep(std::time::Duration::from_millis(800));
                     if let Some(w) = app_clone.get_webview_window("overlay") {
                         let _ = w.emit("screen-captured", &payload);
+                        native_mac::install_esc_monitor(app_clone.clone());
                     }
                 }
 
-                // Clean up temp file and hidden windows
-                let _ = std::fs::remove_file(&file_path);
+                // Clean up hidden windows
                 for label in &["home", "chat", "settings"] {
                     if let Some(w) = app_clone.get_webview_window(label) {
                         let _ = w.close();
@@ -277,6 +299,27 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
     // Close home window if open
     if let Some(w) = app.get_webview_window("home") {
         let _ = w.close();
+    }
+
+    // If no visible windows, switch to Accessory policy for fullscreen Space support
+    let needs_policy = !app.get_webview_window("home").is_some()
+        && !app.get_webview_window("chat").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
+        && !app.get_webview_window("overlay").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
+    if needs_policy && !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Some(ow) = app.get_webview_window("overlay") {
+            let app2 = app.clone();
+            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done2 = done.clone();
+            let _ = ow.run_on_main_thread(move || {
+                app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                done2.store(true, std::sync::atomic::Ordering::SeqCst);
+            });
+            for _ in 0..50 {
+                if done.load(std::sync::atomic::Ordering::SeqCst) { break; }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            IS_ACCESSORY.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 
     // Grab selected text BEFORE focusing our window
@@ -363,6 +406,7 @@ fn grab_selected_text() -> String {
 }
 
 static OVERLAY_ALIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub static IS_ACCESSORY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[tauri::command]
 fn overlay_pong() {

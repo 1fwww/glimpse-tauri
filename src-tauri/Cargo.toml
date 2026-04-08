@@ -19,6 +19,8 @@ xcap = "0.7"
 core-graphics = "0.24"
 core-foundation = "0.10"
 objc2 = "0.6"
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1", version = "2.1.0" }
+block2 = "0.6.2"
 
 # Optimize dependencies even in dev mode (huge impact on image encoding speed)
 [profile.dev.package."*"]

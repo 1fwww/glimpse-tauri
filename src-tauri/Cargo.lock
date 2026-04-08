@@ -1720,6 +1720,7 @@ name = "glimpse"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "block2",
  "core-foundation 0.10.1",
  "core-graphics 0.24.0",
  "dirs 5.0.1",
@@ -1729,6 +1730,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-nspanel",
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-dialog",
  "tauri-plugin-global-shortcut",
@@ -3291,6 +3293,12 @@ dependencies = [
  "smallvec",
  "windows-link 0.2.1",
 ]
+
+[[package]]
+name = "pastey"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b867cad97c0791bbd3aaa6472142568c6c9e8f71937e98379f584cfb0cf35bec"
 
 [[package]]
 name = "pathdiff"
@@ -4972,6 +4980,18 @@ dependencies = [
  "syn 2.0.117",
  "tauri-codegen",
  "tauri-utils",
+]
+
+[[package]]
+name = "tauri-nspanel"
+version = "2.1.0"
+source = "git+https://github.com/ahkohd/tauri-nspanel?branch=v2.1#a3122e894383aa068ec5365a42994e3ac94ba1b6"
+dependencies = [
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "pastey",
+ "tauri",
 ]
 
 [[package]]

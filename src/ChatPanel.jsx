@@ -80,7 +80,7 @@ export default function ChatPanel({
   onNewThread,
   onClearAllThreads,
   onDismissScreenshot,
-  initialContext = '',
+  initialContext = { text: '', seq: 0 },
   annotationCount,
   chatFullSize,
   setChatFullSize,
@@ -101,7 +101,7 @@ export default function ChatPanel({
 }) {
   const [input, setInput] = useState('')
   const [threadMenuOpen, setThreadMenuOpen] = useState(false)
-  const [textContext, setTextContext] = useState(initialContext || '')
+  const [textContext, setTextContext] = useState(initialContext?.text || '')
   const [showApiKeySetup, setShowApiKeySetup] = useState(false)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [modelMenuPos, setModelMenuPos] = useState(null)
@@ -112,8 +112,8 @@ export default function ChatPanel({
 
   // Update textContext when initialContext arrives via IPC
   useEffect(() => {
-    if (initialContext) setTextContext(initialContext)
-  }, [initialContext])
+    if (initialContext?.text) setTextContext(initialContext.text)
+  }, [initialContext?.seq])
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState([])
   const [screenshotAttached, setScreenshotAttached] = useState(true)

@@ -45,13 +45,36 @@ pub fn set_visible_on_fullscreen(window: &tauri::WebviewWindow, visible: bool) {
         unsafe {
             let win = ns_window as *mut AnyObject;
             if visible {
-                // CanJoinAllSpaces (1) | FullScreenAuxiliary (256)
-                let behavior: u64 = 1 | 256;
+                // CanJoinAllSpaces (1 << 0) | FullScreenAuxiliary (1 << 8)
+                let behavior: u64 = (1 << 0) | (1 << 8);
                 let _: () = msg_send![&*win, setCollectionBehavior: behavior];
-                eprintln!("[native_mac] set collection behavior");
+                // Verify it was set
+                let actual: u64 = msg_send![&*win, collectionBehavior];
+                eprintln!("[native_mac] set collection behavior: requested={}, actual={}", behavior, actual);
+                // Also check current level
+                let level: i64 = msg_send![&*win, level];
+                eprintln!("[native_mac] current window level: {}", level);
             } else {
                 let behavior: u64 = 0;
                 let _: () = msg_send![&*win, setCollectionBehavior: behavior];
+            }
+        }
+    }
+}
+
+/// Set collection behavior directly with a specific value
+pub fn set_collection_behavior(window: &tauri::WebviewWindow, behavior: u64) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        if let Ok(ptr) = window.ns_window() {
+            unsafe {
+                let win = ptr as *mut AnyObject;
+                let _: () = msg_send![&*win, setCollectionBehavior: behavior];
+                let actual: u64 = msg_send![&*win, collectionBehavior];
+                eprintln!("[native_mac] set_collection_behavior: requested={}, actual={}", behavior, actual);
             }
         }
     }
@@ -76,12 +99,16 @@ pub fn order_front(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Set window level to screen-saver level (above everything)
+/// Set window level to shielding level (what Electron uses for 'screen-saver')
 pub fn set_window_level_screen_saver(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
     {
         use objc2::runtime::AnyObject;
         use objc2::msg_send;
+
+        extern "C" {
+            fn CGShieldingWindowLevel() -> i32;
+        }
 
         let ns_window = match window.ns_window() {
             Ok(ptr) => ptr,
@@ -90,8 +117,10 @@ pub fn set_window_level_screen_saver(window: &tauri::WebviewWindow) {
 
         unsafe {
             let win = ns_window as *mut AnyObject;
-            let level: i64 = 1000; // kCGScreenSaverWindowLevel
+            let level = CGShieldingWindowLevel() as i64;
             let _: () = msg_send![&*win, setLevel: level];
+            let actual: i64 = msg_send![&*win, level];
+            eprintln!("[native_mac] set window level: requested={}, actual={}", level, actual);
         }
     }
 }
@@ -154,6 +183,181 @@ pub fn set_transparent_background(window: &tauri::WebviewWindow) {
             }
         }
     }
+}
+
+/// Force keyboard focus to this window
+pub fn make_key_window(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        if let Ok(ptr) = window.ns_window() {
+            unsafe {
+                let win = ptr as *mut AnyObject;
+                let _: () = msg_send![&*win, makeKeyAndOrderFront: std::ptr::null::<AnyObject>()];
+            }
+        }
+    }
+}
+
+/// Set window alpha (0.0 = invisible, 1.0 = fully visible)
+pub fn set_window_alpha(window: &tauri::WebviewWindow, alpha: f64) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        if let Ok(ptr) = window.ns_window() {
+            unsafe {
+                let win = ptr as *mut AnyObject;
+                let _: () = msg_send![&*win, setAlphaValue: alpha];
+            }
+        }
+    }
+}
+
+/// Hide the app and return focus to the previous app (prevents Space switching)
+pub fn hide_app() {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::{AnyClass, AnyObject};
+        use objc2::msg_send;
+
+        unsafe {
+            let cls = AnyClass::get(c"NSApplication").unwrap();
+            let app: *mut AnyObject = msg_send![cls, sharedApplication];
+            let _: () = msg_send![&*app, hide: std::ptr::null::<AnyObject>()];
+        }
+    }
+}
+
+/// ESC detection via CGEventTap — system-level event interception.
+/// Works regardless of activation policy, app focus, or window state.
+/// Requires Accessibility permission (which Glimpse already requests).
+use std::ffi::c_void;
+use std::sync::OnceLock;
+
+struct TapPtrs {
+    port: *mut c_void,
+    source: *mut c_void,
+}
+unsafe impl Send for TapPtrs {}
+unsafe impl Sync for TapPtrs {}
+
+static ESC_TAP: std::sync::Mutex<Option<TapPtrs>> = std::sync::Mutex::new(None);
+static ESC_TAP_APP: OnceLock<std::sync::Mutex<Option<tauri::AppHandle>>> = OnceLock::new();
+
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn CGEventTapCreate(
+        tap: u32, place: u32, options: u32, events_of_interest: u64,
+        callback: extern "C" fn(*mut c_void, u32, *mut c_void, *mut c_void) -> *mut c_void,
+        user_info: *mut c_void,
+    ) -> *mut c_void;
+    fn CFMachPortCreateRunLoopSource(alloc: *const c_void, port: *mut c_void, order: i64) -> *mut c_void;
+    fn CFRunLoopAddSource(rl: *mut c_void, source: *mut c_void, mode: *const c_void);
+    fn CFRunLoopRemoveSource(rl: *mut c_void, source: *mut c_void, mode: *const c_void);
+    fn CFRunLoopGetMain() -> *mut c_void;
+    fn CGEventTapEnable(tap: *mut c_void, enable: bool);
+    fn CGEventGetIntegerValueField(event: *mut c_void, field: u32) -> i64;
+    fn CFRelease(cf: *const c_void);
+    static kCFRunLoopCommonModes: *const c_void;
+}
+
+#[cfg(target_os = "macos")]
+extern "C" fn esc_tap_callback(
+    _proxy: *mut c_void, event_type: u32, event: *mut c_void, _user_info: *mut c_void,
+) -> *mut c_void {
+    // Re-enable tap if system disabled it (timeout)
+    // kCGEventTapDisabledByTimeout = 0xFFFFFFFE
+    if event_type == 0xFFFFFFFE {
+        eprintln!("[native_mac] CGEventTap was disabled by timeout, re-enabling");
+        if let Some(ref ptrs) = *ESC_TAP.lock().unwrap() {
+            unsafe { CGEventTapEnable(ptrs.port, true); }
+        }
+        return event;
+    }
+    // kCGEventKeyDown = 10
+    if event_type == 10 {
+        // kCGKeyboardEventKeycode = 9
+        let keycode = unsafe { CGEventGetIntegerValueField(event, 9) };
+        if keycode == 53 {
+            eprintln!("[native_mac] ESC detected via CGEventTap!");
+            let mutex = ESC_TAP_APP.get_or_init(|| std::sync::Mutex::new(None));
+            if let Some(app) = mutex.lock().unwrap().clone() {
+                crate::windows::close_overlay(app);
+            }
+        }
+    }
+    event
+}
+
+pub fn install_esc_monitor(app: tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let mutex = ESC_TAP_APP.get_or_init(|| std::sync::Mutex::new(None));
+        *mutex.lock().unwrap() = Some(app);
+
+        remove_esc_monitor();
+
+        unsafe {
+            // CGEventMaskBit(kCGEventKeyDown) = 1 << 10
+            let tap = CGEventTapCreate(
+                1,    // kCGSessionEventTap
+                0,    // kCGHeadInsertEventTap
+                1,    // kCGEventTapOptionListenOnly
+                1u64 << 10,
+                esc_tap_callback,
+                std::ptr::null_mut(),
+            );
+            if tap.is_null() {
+                eprintln!("[native_mac] CGEventTapCreate FAILED — grant Accessibility permission");
+                return;
+            }
+
+            let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
+            if source.is_null() {
+                eprintln!("[native_mac] CFMachPortCreateRunLoopSource failed");
+                CFRelease(tap as *const c_void);
+                return;
+            }
+
+            let rl = CFRunLoopGetMain();
+            CFRunLoopAddSource(rl, source, kCFRunLoopCommonModes);
+            CGEventTapEnable(tap, true);
+
+            *ESC_TAP.lock().unwrap() = Some(TapPtrs { port: tap, source });
+            eprintln!("[native_mac] ESC CGEventTap installed");
+        }
+    }
+}
+
+pub fn remove_esc_monitor() {
+    #[cfg(target_os = "macos")]
+    {
+        let mut guard = ESC_TAP.lock().unwrap();
+        if let Some(ptrs) = guard.take() {
+            unsafe {
+                CGEventTapEnable(ptrs.port, false);
+                let rl = CFRunLoopGetMain();
+                CFRunLoopRemoveSource(rl, ptrs.source, kCFRunLoopCommonModes);
+                CFRelease(ptrs.source as *const c_void);
+                CFRelease(ptrs.port as *const c_void);
+            }
+            eprintln!("[native_mac] ESC CGEventTap removed");
+        }
+    }
+}
+
+/// Safe focus — works for both NSWindow and NSPanel (Tauri's set_focus crashes on NSPanel)
+pub fn safe_focus(window: &tauri::WebviewWindow) {
+    let _ = window.show();
+    let w = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        order_front(&w);
+        make_key_window(&w);
+    });
 }
 
 /// Set window level to floating

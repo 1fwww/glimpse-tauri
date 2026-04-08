@@ -26,6 +26,10 @@ pub fn create_home_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
     let _ = win.run_on_main_thread(move || {
         crate::native_mac::set_transparent_background(&w);
     });
+    if crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
     Ok(())
 }
 
@@ -256,11 +260,23 @@ pub fn close_welcome(app: AppHandle) {
 
 #[tauri::command]
 pub fn close_overlay(app: AppHandle) {
+    crate::native_mac::remove_esc_monitor();
     if let Some(w) = app.get_webview_window("overlay") {
         let _ = w.close();
     }
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.close();
+    }
+    let has_other = ["home", "chat", "welcome"].iter().any(|l| {
+        app.get_webview_window(l).map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
+    });
+    if !has_other {
+        crate::native_mac::hide_app();
+        // Don't restore Regular here — causes Space switch. Let create_home_window do it.
+        crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
+    } else if crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
     // Schedule re-prewarm for next screenshot
     let app_prewarm = app.clone();
@@ -336,6 +352,21 @@ pub fn close_chat_window(app: AppHandle) {
     }
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.close();
+    }
+    // If no other visible windows, hide app first then restore policy
+    let has_other = ["home", "overlay", "welcome"].iter().any(|l| {
+        app.get_webview_window(l).map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
+    });
+    if !has_other {
+        crate::native_mac::hide_app();
+    }
+    // Restore Regular policy AFTER hide_app (restoring before causes Space switch)
+    if !has_other && crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        // Don't restore here — let create_home_window do it to avoid Space switch
+        crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
+    } else if crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -609,7 +640,7 @@ pub fn show_toast(app: AppHandle, message: String) {
             border:1px solid rgba(0,229,255,0.2);border-radius:10px;padding:8px 20px;\
             display:flex;align-items:center;gap:8px;\
             font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;\
-            color:rgba(230,240,255,0.9);box-shadow:0 4px 20px rgba(0,0,0,0.4)'>\
+            color:rgba(230,240,255,0.9)'>\
             <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgb(52,199,89)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'>\
             <path d='M20 6L9 17l-5-5'/></svg>{}</div></body></html>",
             message
@@ -631,12 +662,31 @@ pub fn show_toast(app: AppHandle, message: String) {
             .skip_taskbar(true)
             .resizable(false)
             .focused(false)
+            .visible(false)
             .build()
         {
+            // Set transparent background + disable shadow synchronously before showing
             let w = win.clone();
+            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done2 = done.clone();
             let _ = win.run_on_main_thread(move || {
                 crate::native_mac::set_transparent_background(&w);
+                // Disable window shadow — toast has its own CSS box-shadow
+                if let Ok(ptr) = w.ns_window() {
+                    unsafe {
+                        use objc2::runtime::AnyObject;
+                        use objc2::msg_send;
+                        let win = ptr as *mut AnyObject;
+                        let _: () = msg_send![&*win, setHasShadow: false];
+                    }
+                }
+                done2.store(true, std::sync::atomic::Ordering::SeqCst);
             });
+            for _ in 0..100 {
+                if done.load(std::sync::atomic::Ordering::SeqCst) { break; }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            let _ = win.show();
             let _ = win.set_ignore_cursor_events(true);
             let _ = win.set_visible_on_all_workspaces(true);
             std::thread::sleep(std::time::Duration::from_millis(1800));

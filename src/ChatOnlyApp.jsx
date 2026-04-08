@@ -4,13 +4,13 @@ import useThreadManager from './useThreadManager'
 import './app.css'
 
 export default function ChatOnlyApp() {
-  const [initialContext, setInitialContext] = useState('')
+  const [initialContext, setInitialContext] = useState({ text: '', seq: 0 })
   const [isPinned, setIsPinned] = useState(false)
   const [croppedImage, setCroppedImage] = useState(null)
   const tm = useThreadManager()
 
   useEffect(() => {
-    window.electronAPI?.onTextContext?.((text) => setInitialContext(text))
+    window.electronAPI?.onTextContext?.((text) => setInitialContext(prev => ({ text, seq: prev.seq + 1 })))
     window.electronAPI?.onPinState?.((state) => setIsPinned(state))
     window.electronAPI?.onSetCroppedImage?.((img) => setCroppedImage(img))
     // Receive full thread data from pin (no disk read needed)

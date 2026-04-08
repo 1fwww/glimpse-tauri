@@ -71,6 +71,9 @@ export default function App() {
       setIsSelecting(false)
       setHoveredWindow(null)
       setFrozenChatPos(null)
+      setCopyFeedback(false)
+      setSaveFeedback(false)
+      setIsExiting(false)
     }
 
     const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset) => {
@@ -84,6 +87,8 @@ export default function App() {
         y: win.y - off.y,
       })))
       resetState()
+      // Ensure overlay has keyboard focus for ESC handling
+      window.focus()
 
       tm.refreshWithHeuristic()
     })
@@ -96,8 +101,10 @@ export default function App() {
 
     const removeReset = window.electronAPI.onResetOverlay?.(() => {
       resetState()
-      // Reply pong so backend knows we're alive
-      window.__TAURI_INTERNALS__?.invoke('overlay_pong').catch(() => {})
+      // Reply pong only if we're actually visible (not during close)
+      if (document.visibilityState === 'visible') {
+        window.__TAURI_INTERNALS__?.invoke('overlay_pong').catch(() => {})
+      }
     })
 
     return () => {
@@ -195,8 +202,8 @@ export default function App() {
       await window.electronAPI?.copyImage(img)
       setCopyFeedback(true)
       // Exit and show toast
-      window.electronAPI?.showToast('Copied to clipboard')
       window.electronAPI?.closeOverlay()
+      window.electronAPI?.showToast('Copied to clipboard')
     }
   }, [getHiResComposite])
 
@@ -209,8 +216,8 @@ export default function App() {
       if (result?.success) {
         setSaveFeedback(true)
         const folder = result.filePath?.split('/').slice(-2, -1)[0]
-        window.electronAPI?.showToast(folder ? `Saved to ${folder}` : 'Saved')
         window.electronAPI?.closeOverlay()
+        window.electronAPI?.showToast(folder ? `Saved to ${folder}` : 'Saved')
       }
     }
   }, [getHiResComposite])

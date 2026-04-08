@@ -13,6 +13,10 @@ pub fn check_permissions() -> Result<Value, String> {
 #[tauri::command]
 pub fn request_screen_permission() -> Result<Value, String> {
     let granted = request_screen_recording();
+    if !granted {
+        // CGRequestScreenCaptureAccess only prompts once — fallback to System Settings
+        open_permission_settings("screen".to_string());
+    }
     Ok(json!({ "granted": granted }))
 }
 
