@@ -241,6 +241,10 @@ export default function ChatPanel({
   // After welcome animation, auto-send pending question (skip re-adding user msg)
   useEffect(() => {
     if (!showWelcome && pendingQuestion.current && availableProviders.length > 0) {
+      if (!provider || !modelId) {
+        // Providers loaded but no model selected yet — wait for next render
+        return
+      }
       const q = pendingQuestion.current
       const pendingImage = pendingImageRef.current
       const pendingSnippet = pendingSnippetRef.current
@@ -270,7 +274,9 @@ export default function ChatPanel({
         try {
           const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
           setIsLoading(false)
-          if (result.success) {
+          if (!result?.success) {
+            setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result?.error || 'Something went wrong'}` }])
+          } else {
             const assistantText = result.content.map(c => c.text || '').join('')
             const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
             apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
@@ -303,8 +309,9 @@ export default function ChatPanel({
               setIsNewThread(false)
             }
           }
-        } catch {
+        } catch (err) {
           setIsLoading(false)
+          setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${err.message || 'Something went wrong'}` }])
         }
       })()
     }
