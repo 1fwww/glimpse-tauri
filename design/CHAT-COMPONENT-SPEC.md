@@ -111,31 +111,36 @@ PINNED STATE:
 display: flex, align-items: center, gap: 6px
 margin: 6px 8px 2px
 padding: 5px 10px
-background: rgba(108,99,255,0.06)                     DARK  (--brand-dim)
-            rgba(108,99,255,0.06)                     LIGHT
-border-left: 2px solid rgba(108,99,255,0.22)          DARK  (--brand-border)
-             2px solid rgba(108,99,255,0.22)          LIGHT
+background: rgba(108,99,255,0.12)                     DARK  (bumped from 0.06 — was invisible)
+            rgba(108,99,255,0.06)                     LIGHT (unchanged — already visible)
+border-left: 2px solid rgba(108,99,255,0.35)          DARK  (bumped from 0.22)
+             2px solid rgba(108,99,255,0.22)          LIGHT (unchanged)
 border-radius: 2px 6px 6px 2px (flat left, rounded right)
 font: Outfit, 11px
-color: rgba(175,172,205,0.75)                         DARK  (--text-secondary)
-       rgba(45,45,62,0.72)                            LIGHT
+color: rgba(175,172,205,0.75)                         DARK  (--text-secondary, 4.62:1 ✓)
+       rgba(45,45,62,0.72)                            LIGHT (5.06:1 ✓)
 icon: 13x13, stroke-width 1.5, same color as text
 ```
 
 ### Dismiss button (× on attachment)
 ```
+Simplified — no background, no border. Just × character in --text-secondary.
+This passes AA (4.62:1 dark, 5.06:1 light) and is visually cleaner.
+
 width: 16px, height: 16px
 border-radius: 50%
-background: rgba(255,255,255,0.08)                    DARK
-            rgba(0,0,0,0.05)                          LIGHT
-border: 1px solid rgba(255,255,255,0.10)              DARK
-        1px solid rgba(0,0,0,0.08)                    LIGHT
-color: rgba(140,137,175,0.50)                         DARK  (--text-dim)
+background: transparent                               BOTH
+border: none                                          BOTH
+color: rgba(175,172,205,0.75)                         DARK  (--text-secondary)
+       rgba(45,45,62,0.72)                            LIGHT
 font-size: 10px
 margin-left: auto
+cursor: pointer
 hover:
-  background: rgba(255,255,255,0.14)                  DARK
-  color: rgba(175,172,205,0.75)                       DARK  (--text-secondary)
+  color: rgba(242,240,255,0.93)                       DARK  (--text-primary)
+         rgba(18,18,25,0.90)                          LIGHT
+  background: rgba(255,255,255,0.06)                  DARK  (--surface-hover)
+              rgba(0,0,0,0.035)                       LIGHT
 ```
 
 ---
@@ -144,11 +149,15 @@ hover:
 
 Same as attachment cue but with:
 ```
-background: rgba(108,99,255,0.06)
-border-left: 2px solid rgba(108,99,255,0.40)          (slightly stronger than attachment)
+background: rgba(108,99,255,0.12)                     DARK  (same as attachment)
+            rgba(108,99,255,0.06)                     LIGHT (same as attachment)
+border-left: 2px solid rgba(108,99,255,0.50)          DARK  (bumped from 0.40 — needs to be visibly stronger than attachment)
+             2px solid rgba(108,99,255,0.40)          LIGHT (unchanged)
 font: JetBrains Mono, 11px (it's referenced text — technical data)
 color: rgba(175,172,205,0.75)                         DARK  (--text-secondary)
+       rgba(45,45,62,0.72)                            LIGHT
 max-height: 120px, overflow-y: auto
+dismiss: same simplified × as attachment
 ```
 
 ---
