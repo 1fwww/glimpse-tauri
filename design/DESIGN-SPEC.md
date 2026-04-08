@@ -619,23 +619,113 @@ See `mockups/api-key-setup.html` for all states in both themes.
 
 ---
 
-## 14. Migration Summary
+## 14. Implementation Guide
 
-1. **Delete** all cyan/magenta tokens and references
-2. **Add** the new token system (brand, light theme, dark theme, pinned state variants)
-3. **Switch** all non-code UI text from `--font-mono` to `--font-display`, minimum 11px, drop uppercase
-4. **Replace** selection border (remove brackets, glow, pulse; add round handles, static brand border)
-5. **Replace** all `#00e5ff` / cyan references with `--brand` / `--brand-text`
-6. **Remove** infinite animations (`selectionPulse`, `shortcutPulse`), replace `overlayExit` with fade
-7. **Add** `prefers-reduced-motion` media query
-8. **Add** `:focus-visible` states and `aria-label` to all icon buttons
-9. **Replace** "Copy" text buttons with dim icon-only copy buttons
-10. **Implement** pinned state transition (shadow lift + scale + blur + border + surface shift)
-11. **Add** theme toggle support (light default, dark optional, user preference persisted)
-12. **Replace** logo SVG paths with polished version (all instances in JSX components)
-13. **Replace** old `eyebrowWiggle` with three context-specific animations (draw-on, squint loop, double blink)
-14. **Update** app icon: use polished logo on `#141414` background, provide as square (OS applies squircle mask)
-15. **Replace** annotation color palette: 8 colors → 7 colorblind-safe colors (drop green, yellow, purple; add cyan, pink)
+This is the step-by-step guide for implementing the redesign. Follow in order — each phase builds on the previous. After each phase, verify against the referenced mockups.
+
+### Phase 1: Foundation (tokens + global CSS)
+
+**Files:** `src/app.css` (`:root` section)
+
+1. Delete all cyan/magenta tokens: `--cyan-primary`, `--cyan-dim`, `--cyan-glow`, `--cyan-subtle`, `--magenta-accent`, `--magenta-glow`
+2. Add the complete new token system from **Section 3**: brand tokens (with light/dark variants), Warm Gray light theme, Brand-tinted dark theme, Soft Lavender pinned tokens, semantic colors (note: dark error is `#EF4444`, not `#CF222E`)
+3. Add spacing tokens from **Section 4**: `--space-1` through `--space-10`, radii `--radius-sm` through `--radius-full`
+4. Add `prefers-reduced-motion` media query from **Section 6**
+5. Add global `:focus-visible` style from **Section 7**
+6. Add theme toggle CSS structure: `.theme-light` (default) and `.theme-dark` classes that swap all surface/border/text/shadow tokens
+
+**Verify:** All existing UI should render with the new tokens. Colors will change globally — cyan→brand, cold navy→warm dark. Nothing should be broken, just recolored.
+
+### Phase 2: Typography
+
+**Files:** `src/app.css` (every component section)
+
+7. Switch every non-code element from `var(--font-mono)` to `var(--font-display)`. The full list of ~16 CSS classes to change is in **Section 2 Migration table**. Key ones: `.home-section-label`, `.home-recent-time`, `.settings-btn-sm`, `.chat-tooltip`, `.thinking-text`, `.home-bg-hint`, `.welcome-skip-link`, `.model-dropdown-provider`, `.loading-text`
+8. Bump all text below 11px to 11px minimum
+9. Drop all `text-transform: uppercase` and `letter-spacing` on non-code text
+10. Change toolbar "RESET" to "Reset" in `EditToolbar.jsx`
+
+**Verify:** All UI text should be in Outfit except code blocks, API keys, kbd elements, model names, dimension badge, and window hover labels.
+
+### Phase 3: Logo + Animations
+
+**Files:** All JSX files that render the Glimpse SVG logo, `src/app.css`
+
+11. Replace all logo SVG paths with the polished version from **Section 5** (same viewBox, drop-in replacement). Files: `ChatPanel.jsx` (GlimpseIcon component), `HomeApp.jsx`, `WelcomeApp.jsx`, `EditToolbar.jsx`
+12. Remove the old `eyebrowWiggle` keyframes and `.glimpse-loading` class
+13. Add three new animation systems from **Section 5**: draw-on (`.logo-draw`), squint-loop (`.logo-think`), double-blink (`.logo-blink`) with full CSS keyframes
+14. Remove `selectionPulse`, `shortcutPulse` infinite animations
+15. Replace `overlayExit` with a simple 150ms opacity fade
+16. Replace thinking indicator: change from opacity-pulsing text to Glimpse eye (squint-loop) + animated dots + "Thinking" text. See **Section 6** for the HTML structure and CSS
+
+**Verify:** Open `mockups/logo-final-animations.html` and compare. Logo should be smoother with tighter eyebrow. Animations should match the three contexts.
+
+### Phase 4: Chat Panel
+
+**Files:** `ChatPanel.jsx`, `src/app.css` (chat panel section)
+
+17. **Header restructure** (Section 9): Change from `[title ▼] [eye] [pin] [+new] [minimize] [close]` to `[eye] [title ▼] ... [+new] | [pin]`. Remove minimize and close buttons from header. Eye is decorative (wiggle on click), not a navigation target.
+18. **Footer bar restructure** (Section 9): Change from `[settings] [esc] ... [model ▼]` — keep settings gear (left), "Esc to close" with kbd styling (left), model switcher in mono (right). Add version info if not present.
+19. **Code blocks** (Section 9): Add header bar with language label + dim copy icon. Remove "Copy" text button. Icon is always visible at low opacity, brightens on hover, green on copy.
+20. **Blockquotes** (Section 9): Add dim copy icon top-right (same pattern as code blocks). Remove "Copy" text button.
+21. **Inline code**: Keep click-to-copy, add brand-tinted hover state
+22. **Message bubbles**: User messages use `--brand-muted` background (not cyan). Assistant messages use `--surface-elevated` with `--border-dim`.
+23. **Pinned state transition** (Section 8): Implement the full pin transition — shadow lift, `scale(1.015) translateY(-4px)`, `backdrop-filter: blur(20px)`, border weight 1→1.5px, surface shift from Warm Gray to Soft Lavender (light) or opaque to translucent (dark). All over 450ms with `cubic-bezier(0.22, 1, 0.36, 1)`.
+
+**Verify:** Open `mockups/chat-header.html` (Option B), `mockups/copy-patterns.html` (Option C), `mockups/pinned-v2.html`, `mockups/dark-theme.html` (pinned section).
+
+### Phase 5: Selection + Edit Toolbar
+
+**Files:** `App.jsx`, `EditToolbar.jsx`, `DrawingCanvas.jsx`, `src/app.css`
+
+24. **Selection border**: Remove corner brackets (`.corner-tr`, `.corner-bl`, `::before`, `::after`), remove pulsing glow, remove square handles. Add: static 1.5px `--brand` border, round resize handles (circles with white border), no animation.
+25. **Edit toolbar**: Replace cyan active states with `--brand-muted` background + `--brand-text` color. "Reset" in Outfit 11px. Cancel button dim by default, `--error` on hover only. Remove all glow box-shadows. AI toggle uses brand border.
+26. **Annotation colors**: Replace 8-color array in `EditToolbar.jsx` with the 7-color colorblind-safe palette from **Section 7**: `['#DC3545', '#E08700', '#06B6D4', '#1E40AF', '#EC4899', '#000000', '#ffffff']`
+
+**Verify:** Open `mockups/toolbar.html` (selection comparison), `mockups/edit-toolbar.html`, `mockups/annotation-colors.html`.
+
+### Phase 6: Welcome Flow
+
+**Files:** `WelcomeApp.jsx`, `src/app.css`
+
+27. **Step 0**: Replace title "Welcome to Glimpse" → "Glimpse". Replace old wiggle with draw-on animation + single blink after 1.5s delay. See **Section 10** for details.
+28. **Step 1**: Change disabled button text "Waiting for permissions..." → "Grant both to continue". Delay skip link by 5 seconds (was immediate). Green check uses stroke-draw animation (0.3s). Check color: `#238542`.
+29. **Step 2**: Remove `shortcutPulse` animation. Active shortcut card gets static `--brand-muted` background. CTA does scale pop (`0.97→1.0`, 200ms) when both shortcuts complete. Skip delay: 5 seconds (was 10). Disabled text: "Try both to continue".
+30. **Step 3**: Pin icon color `#00E5FF` → `#6C63FF`. Easter egg text "Now go build something" → "You got it. That's all you need." Add API key hint below pin card: "To chat with AI, add an API key in Settings." Active dot pulses once (scale 1.0→1.3→1.0, 300ms) on step load.
+
+**Verify:** Open `mockups/welcome-flow.html` — all 4 steps in both themes.
+
+### Phase 7: Settings
+
+**Files:** `SettingsApp.jsx`, `src/app.css`
+
+31. **Theme toggle**: Add to Preferences section — three-way button group [Light] [Dark] [System]. Persist to localStorage. "System" follows `prefers-color-scheme`. See **Section 11**.
+32. **Delete confirmation**: Replace instant delete with inline confirmation — "Delete this key?" with [Delete] (red) and [Keep] buttons. No modal.
+33. **Error copy**: Change "Invalid API key. Check your key and try again." → "Invalid key — get a new one" (link to provider console).
+34. **Shortcuts note**: Add "Customizable shortcuts coming soon" in `--text-dim` below shortcut rows.
+35. **Version info**: Add "Glimpse v1.0" to footer left. Add "Esc to close" with kbd styling to footer right.
+36. **Typography**: Section titles → Outfit 11px medium, sentence case. Button text → Outfit 11px medium. Toggle on-state → `--brand` color.
+
+**Verify:** Open `mockups/settings.html` — all API key states, theme toggle, delete confirm in both themes.
+
+### Phase 8: API Key Setup
+
+**Files:** `ApiKeySetup.jsx`, `src/app.css`
+
+37. **Title**: "Glimpse Chat Setup" → "Connect to AI". Remove key icon next to title (header eye provides brand presence).
+38. **Description**: "Add any API key to get started. Keys are stored locally." → one line: "Keys stay on your device." After saving a key: "Add more keys or start chatting."
+39. **CTA**: "Save & Continue" → "Connect". "Maybe later" → "Skip for now".
+40. **Error**: "Invalid key — get a new one" (one line with inline link). Remove separate "Get key" line.
+41. **Delight**: Header eye does squint-loop during "Verifying..." state, double-blink on key saved.
+42. **Success transition**: Keep existing "Key added. Happy chatting!" with Glimpse eye doing double-blink, display for ~2s then fade to chat.
+
+**Verify:** Open `mockups/api-key-setup.html` — all states in both themes.
+
+### Phase 9: App Icon + Final
+
+43. **App icon**: Replace logo paths in `src/glimpse-logo.svg` and regenerate all icon sizes in `src-tauri/icons/`. Use polished logo on `#141414` background. Provide as square — OS applies squircle mask.
+44. **ARIA labels**: Add `aria-label` to every icon-only button. Full list in **Section 7**.
+45. **Final pass**: Search entire codebase for any remaining `#00e5ff`, `#00E5FF`, `cyan`, `magenta`, `#ff2d78`. All should be replaced or removed.
 
 ---
 
