@@ -331,9 +331,10 @@
   transform: none;
   border: 1px solid transparent;
   padding: 2px;
-  background: #14141C;
+  background: #222131;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .theme-light .chat-only-app .chat-panel.pinned-panel {
@@ -346,15 +347,16 @@
 
 /* Subtler separators when pinned */
 .chat-only-app .pinned-panel .chat-header {
-  border-bottom-color: rgba(0, 0, 0, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .chat-only-app .pinned-panel .chat-input-box {
-  border-color: rgba(0, 0, 0, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .chat-only-app .pinned-panel .chat-input-area {
-  border-top-color: rgba(0, 0, 0, 0.05);
+  border-top-color: rgba(255, 255, 255, 0.06);
 }
 
 .chat-only-app .chat-header {
