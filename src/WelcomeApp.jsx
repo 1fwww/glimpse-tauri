@@ -107,7 +107,7 @@ export default function WelcomeApp() {
               </svg>
             </div>
             <h1 className="welcome-title">Glimpse</h1>
-            <p className="welcome-desc">Snap it. Ask it. Never lose your flow.</p>
+            <p className="welcome-desc">Glimpse your screen. Stay in flow.</p>
             <button className="welcome-btn" onClick={() => setStep(1)}>Get Started</button>
           </div>
         )}
