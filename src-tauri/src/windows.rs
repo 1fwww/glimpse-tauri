@@ -27,7 +27,7 @@ pub fn create_home_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         crate::native_mac::set_transparent_background(&w);
     });
     if crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
-        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
         crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
     Ok(())
@@ -262,7 +262,23 @@ pub fn close_welcome(app: AppHandle) {
 pub fn close_overlay(app: AppHandle) {
     crate::native_mac::remove_esc_monitor();
     if let Some(w) = app.get_webview_window("overlay") {
-        let _ = w.close();
+        // Hide immediately — non-fullscreen can reuse this instantly
+        // Don't emit reset-overlay here — avoids blank flash on reuse.
+        // screen-captured event will overwrite state when shown again.
+        let _ = w.set_always_on_top(false);
+        let _ = w.hide();
+        // After a delay, destroy and prewarm fresh (needed for fullscreen Space association)
+        let app2 = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            if let Some(ow) = app2.get_webview_window("overlay") {
+                if !ow.is_visible().unwrap_or(true) {
+                    let _ = ow.close();
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    let _ = prewarm_overlay(&app2);
+                }
+            }
+        });
     }
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.close();
@@ -272,18 +288,11 @@ pub fn close_overlay(app: AppHandle) {
     });
     if !has_other {
         crate::native_mac::hide_app();
-        // Don't restore Regular here — causes Space switch. Let create_home_window do it.
-        crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     } else if crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
-        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        crate::native_mac::hide_app();
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
         crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
-    // Schedule re-prewarm for next screenshot
-    let app_prewarm = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        let _ = prewarm_overlay(&app_prewarm);
-    });
 }
 
 #[tauri::command]
@@ -365,7 +374,7 @@ pub fn close_chat_window(app: AppHandle) {
         // Don't restore here — let create_home_window do it to avoid Space switch
         crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     } else if crate::IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
-        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
         crate::IS_ACCESSORY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }
@@ -784,11 +793,13 @@ pub async fn save_image(app: AppHandle, data_url: String) -> Result<serde_json::
     let dest = if save_location == "folder" && !save_path.is_empty() {
         std::path::PathBuf::from(save_path).join(&filename)
     } else {
-        // Use save dialog so user can pick location AND customize filename
+        // Lower overlay so save dialog isn't covered by it
+        lower_overlay(app.clone());
         let file = app.dialog().file()
             .set_file_name(&filename)
             .add_filter("PNG Image", &["png"])
             .blocking_save_file();
+        restore_overlay(app.clone());
         match file {
             Some(p) => std::path::PathBuf::from(p.to_string()),
             None => return Ok(serde_json::json!({ "success": false })),

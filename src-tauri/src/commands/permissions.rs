@@ -10,14 +10,21 @@ pub fn check_permissions() -> Result<Value, String> {
     }))
 }
 
+static SCREEN_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 #[tauri::command]
 pub fn request_screen_permission() -> Result<Value, String> {
-    let granted = request_screen_recording();
-    if !granted {
-        // CGRequestScreenCaptureAccess only prompts once — fallback to System Settings
-        open_permission_settings("screen".to_string());
+    if check_screen_recording() {
+        return Ok(json!({ "granted": true }));
     }
-    Ok(json!({ "granted": granted }))
+    if SCREEN_REQUESTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        // Already prompted once — system won't show again, open Settings instead
+        open_permission_settings("screen".to_string());
+    } else {
+        // First time — show the system prompt
+        request_screen_recording();
+    }
+    Ok(json!({ "granted": false }))
 }
 
 #[tauri::command]

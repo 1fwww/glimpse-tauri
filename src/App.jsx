@@ -530,12 +530,7 @@ export default function App() {
   }
 
   if (!screenImage) {
-    return (
-      <div className="loading">
-        <div className="loading-spinner" />
-        <div className="loading-text">Capturing screen</div>
-      </div>
-    )
+    return null // Invisible until screenshot data arrives
   }
 
   const chatPos = frozenChatPos || getChatPosition()

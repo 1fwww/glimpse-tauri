@@ -62,23 +62,6 @@ pub fn set_visible_on_fullscreen(window: &tauri::WebviewWindow, visible: bool) {
     }
 }
 
-/// Set collection behavior directly with a specific value
-pub fn set_collection_behavior(window: &tauri::WebviewWindow, behavior: u64) {
-    #[cfg(target_os = "macos")]
-    {
-        use objc2::runtime::AnyObject;
-        use objc2::msg_send;
-
-        if let Ok(ptr) = window.ns_window() {
-            unsafe {
-                let win = ptr as *mut AnyObject;
-                let _: () = msg_send![&*win, setCollectionBehavior: behavior];
-                let actual: u64 = msg_send![&*win, collectionBehavior];
-                eprintln!("[native_mac] set_collection_behavior: requested={}, actual={}", behavior, actual);
-            }
-        }
-    }
-}
 
 /// Force window to front regardless of Space
 pub fn order_front(window: &tauri::WebviewWindow) {
@@ -180,38 +163,6 @@ pub fn set_transparent_background(window: &tauri::WebviewWindow) {
                     let _: () = msg_send![&*view, _setDrawsBackground: false];
                 }
                 set_subviews_transparent(view, clear, draw_sel);
-            }
-        }
-    }
-}
-
-/// Force keyboard focus to this window
-pub fn make_key_window(window: &tauri::WebviewWindow) {
-    #[cfg(target_os = "macos")]
-    {
-        use objc2::runtime::AnyObject;
-        use objc2::msg_send;
-
-        if let Ok(ptr) = window.ns_window() {
-            unsafe {
-                let win = ptr as *mut AnyObject;
-                let _: () = msg_send![&*win, makeKeyAndOrderFront: std::ptr::null::<AnyObject>()];
-            }
-        }
-    }
-}
-
-/// Set window alpha (0.0 = invisible, 1.0 = fully visible)
-pub fn set_window_alpha(window: &tauri::WebviewWindow, alpha: f64) {
-    #[cfg(target_os = "macos")]
-    {
-        use objc2::runtime::AnyObject;
-        use objc2::msg_send;
-
-        if let Ok(ptr) = window.ns_window() {
-            unsafe {
-                let win = ptr as *mut AnyObject;
-                let _: () = msg_send![&*win, setAlphaValue: alpha];
             }
         }
     }
@@ -348,16 +299,6 @@ pub fn remove_esc_monitor() {
             eprintln!("[native_mac] ESC CGEventTap removed");
         }
     }
-}
-
-/// Safe focus — works for both NSWindow and NSPanel (Tauri's set_focus crashes on NSPanel)
-pub fn safe_focus(window: &tauri::WebviewWindow) {
-    let _ = window.show();
-    let w = window.clone();
-    let _ = window.run_on_main_thread(move || {
-        order_front(&w);
-        make_key_window(&w);
-    });
 }
 
 /// Set window level to floating

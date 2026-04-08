@@ -151,25 +151,22 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
     let has_visible = is_vis("home") || is_vis("chat") || is_vis("settings") || is_vis("overlay");
     eprintln!("[Screenshot] triggered, has_visible={}", has_visible);
 
-    // Switch to Accessory policy + refresh overlay's collection behavior
-    // This allows overlay to appear on fullscreen Spaces
+    // Switch to Accessory policy — must complete before capture for fullscreen Spaces
     if !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
-        let app2 = app.clone();
-        let ow_ref = app.get_webview_window("overlay");
-        if let Some(ow) = ow_ref {
+        if let Some(ow) = app.get_webview_window("overlay") {
+            let app2 = app.clone();
             let ow2 = ow.clone();
             let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let done2 = done.clone();
             let _ = ow.run_on_main_thread(move || {
-                app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                // Refresh collection behavior under new policy so prewarm works on fullscreen
+                let _ = app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 native_mac::set_visible_on_fullscreen(&ow2, true);
                 native_mac::set_window_level_screen_saver(&ow2);
                 done2.store(true, std::sync::atomic::Ordering::SeqCst);
             });
-            for _ in 0..50 {
+            for _ in 0..30 {
                 if done.load(std::sync::atomic::Ordering::SeqCst) { break; }
-                std::thread::sleep(std::time::Duration::from_millis(5));
+                std::thread::sleep(std::time::Duration::from_millis(2));
             }
             IS_ACCESSORY.store(true, std::sync::atomic::Ordering::SeqCst);
         }
@@ -239,7 +236,7 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                     let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: dw, height: dh }));
                     let _ = w.set_always_on_top(true);
                     let _ = w.set_visible_on_all_workspaces(true);
-                    // Activate app + set window level synchronously before showing
+                    // Activate app synchronously before showing (minimal wait)
                     let w2 = w.clone();
                     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                     let done2 = done.clone();
@@ -250,20 +247,26 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                         native_mac::order_front(&w2);
                         done2.store(true, std::sync::atomic::Ordering::Release);
                     });
-                    for _ in 0..100 {
+                    for _ in 0..30 {
                         if done.load(std::sync::atomic::Ordering::Acquire) { break; }
-                        std::thread::sleep(std::time::Duration::from_millis(5));
+                        std::thread::sleep(std::time::Duration::from_millis(2));
                     }
                     let _ = w.emit("screen-captured", &payload);
                     let _ = w.show();
                     let _ = w.set_focus();
-                    // Install ESC global monitor so ESC works before selection
+                    // Install ESC monitor
                     native_mac::install_esc_monitor(app_clone.clone());
                 } else {
                     eprintln!("[Screenshot] no pre-warm, creating fresh overlay");
                     let _ = windows::create_overlay_window(&app_clone, &display_info);
                     // Wait for webview to load (fresh overlay, no prewarm)
-                    std::thread::sleep(std::time::Duration::from_millis(800));
+                    // Wait for webview to load, polling for readiness
+                    for _ in 0..40 {
+                        if app_clone.get_webview_window("overlay").is_some() { break; }
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
+                    // Small extra delay for webview JS to initialize
+                    std::thread::sleep(std::time::Duration::from_millis(200));
                     if let Some(w) = app_clone.get_webview_window("overlay") {
                         let _ = w.emit("screen-captured", &payload);
                         native_mac::install_esc_monitor(app_clone.clone());
@@ -311,7 +314,7 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
             let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let done2 = done.clone();
             let _ = ow.run_on_main_thread(move || {
-                app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                let _ = app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 done2.store(true, std::sync::atomic::Ordering::SeqCst);
             });
             for _ in 0..50 {

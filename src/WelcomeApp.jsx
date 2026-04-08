@@ -37,10 +37,16 @@ export default function WelcomeApp() {
     const result = await window.electronAPI?.checkPermissions()
     if (result) setPermissions(result)
     setChecking(false)
+    return result
   }
 
   useEffect(() => {
-    checkPermissions()
+    // On mount, check permissions and force back to step 1 if not granted
+    checkPermissions().then(result => {
+      if (result && (!result.screen || !result.accessibility)) {
+        setStep(prev => prev > 1 ? 1 : prev)
+      }
+    })
     const interval = setInterval(checkPermissions, 2000)
     return () => clearInterval(interval)
   }, [])

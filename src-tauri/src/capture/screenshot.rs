@@ -150,20 +150,4 @@ pub fn capture_screen_to_memory() -> Result<(String, serde_json::Value), String>
     }
 }
 
-/// Fallback: capture via screencapture command
-pub fn capture_screen_to_file() -> Result<(String, serde_json::Value), String> {
-    let display_info = get_display_info()?;
-    let temp_path = std::env::temp_dir().join("glimpse-capture.jpg");
-    let path_str = temp_path.to_string_lossy().to_string();
 
-    let output = std::process::Command::new("screencapture")
-        .args(["-x", "-t", "jpg", "-C", &path_str])
-        .output()
-        .map_err(|e| format!("screencapture failed: {}", e))?;
-
-    if !output.status.success() {
-        return Err("screencapture returned non-zero".to_string());
-    }
-
-    Ok((path_str, display_info))
-}
