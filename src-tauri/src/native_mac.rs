@@ -63,6 +63,75 @@ pub fn set_visible_on_fullscreen(window: &tauri::WebviewWindow, visible: bool) {
 }
 
 
+/// Enable or disable NSWindow shadow
+pub fn set_window_shadow(window: &tauri::WebviewWindow, shadow: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        let ns_window = match window.ns_window() {
+            Ok(ptr) => ptr,
+            Err(_) => return,
+        };
+
+        unsafe {
+            let win = ns_window as *mut AnyObject;
+            let _: () = msg_send![&*win, setHasShadow: shadow];
+        }
+    }
+}
+
+/// Animate window frame change using NSWindow setFrame:display:animate:
+pub fn animate_frame(window: &tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f64) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        // NSRect-compatible struct for objc2 msg_send
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        struct CGPoint { x: f64, y: f64 }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        struct CGSize { width: f64, height: f64 }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        struct CGRect { origin: CGPoint, size: CGSize }
+
+        unsafe impl objc2::Encode for CGPoint {
+            const ENCODING: objc2::Encoding = objc2::Encoding::Struct("CGPoint", &[objc2::Encoding::Double, objc2::Encoding::Double]);
+        }
+        unsafe impl objc2::Encode for CGSize {
+            const ENCODING: objc2::Encoding = objc2::Encoding::Struct("CGSize", &[objc2::Encoding::Double, objc2::Encoding::Double]);
+        }
+        unsafe impl objc2::Encode for CGRect {
+            const ENCODING: objc2::Encoding = objc2::Encoding::Struct("CGRect", &[CGPoint::ENCODING, CGSize::ENCODING]);
+        }
+
+        let ns_window = match window.ns_window() {
+            Ok(ptr) => ptr,
+            Err(_) => return,
+        };
+
+        unsafe {
+            let win = ns_window as *mut AnyObject;
+            // Get screen height for coordinate flip (macOS uses bottom-left origin)
+            let screen: *mut AnyObject = msg_send![&*win, screen];
+            let screen_frame: CGRect = msg_send![&*screen, frame];
+            let screen_h = screen_frame.size.height;
+            // Flip y: macOS origin is bottom-left
+            let flipped_y = screen_h - y - h;
+            let frame = CGRect {
+                origin: CGPoint { x, y: flipped_y },
+                size: CGSize { width: w, height: h },
+            };
+            let _: () = msg_send![&*win, setFrame: frame display: true animate: true];
+        }
+    }
+}
+
 /// Force window to front regardless of Space
 pub fn order_front(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]

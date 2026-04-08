@@ -236,7 +236,7 @@ export default function DrawingCanvas({
         const bounds = getBounds(ann)
         if (bounds) {
           ctx.save()
-          ctx.strokeStyle = 'rgba(0, 229, 255, 0.7)'
+          ctx.strokeStyle = 'rgba(108, 99, 255, 0.7)'
           ctx.lineWidth = 1
           ctx.setLineDash([4, 3])
           ctx.strokeRect(bounds.x - 4, bounds.y - 4, bounds.w + 8, bounds.h + 8)
@@ -246,11 +246,11 @@ export default function DrawingCanvas({
           const handles = getHandles(ann)
           for (const h of handles) {
             ctx.save()
-            ctx.shadowColor = 'rgba(0, 229, 255, 0.6)'
+            ctx.shadowColor = 'rgba(108, 99, 255, 0.6)'
             ctx.shadowBlur = 6
             ctx.beginPath()
             ctx.arc(h.x, h.y, HANDLE_SIZE / 2, 0, Math.PI * 2)
-            ctx.fillStyle = 'rgba(0, 229, 255, 0.9)'
+            ctx.fillStyle = 'rgba(108, 99, 255, 0.9)'
             ctx.fill()
             ctx.restore()
             // Inner dot

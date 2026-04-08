@@ -11,6 +11,10 @@ export default function SettingsApp() {
   const [keyError, setKeyError] = useState('')
   const [deletingKey, setDeletingKey] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('glimpse-theme') || 'system')
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSaving, setInviteSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -62,6 +66,22 @@ export default function SettingsApp() {
       window.electronAPI?.notifyProvidersChanged?.()
     } else {
       setKeyError(result?.error || 'Invalid key')
+    }
+  }
+
+  const handleInviteCode = async () => {
+    if (!inviteCode.trim()) return
+    setInviteSaving(true)
+    setInviteError('')
+    const result = await window.electronAPI?.validateInviteCode(inviteCode.trim())
+    setInviteSaving(false)
+    if (result?.valid) {
+      setShowInvite(false)
+      setInviteCode('')
+      loadData()
+      window.electronAPI?.notifyProvidersChanged?.()
+    } else {
+      setInviteError(result?.error || 'Invalid code')
     }
   }
 
@@ -186,6 +206,28 @@ export default function SettingsApp() {
                   )}
                 </div>
               ))}
+              {!showInvite ? (
+                <button className="settings-invite-link" onClick={() => setShowInvite(true)}>
+                  Have an invite code?
+                </button>
+              ) : (
+                <div className="settings-invite-input">
+                  <input
+                    type="text"
+                    placeholder="Enter invite code"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleInviteCode()}
+                    autoFocus
+                    spellCheck={false}
+                  />
+                  <button className="settings-btn-sm" onClick={handleInviteCode} disabled={inviteSaving}>
+                    {inviteSaving ? '...' : 'Apply'}
+                  </button>
+                  <button className="settings-btn-sm cancel" onClick={() => { setShowInvite(false); setInviteCode(''); setInviteError('') }}>Cancel</button>
+                  {inviteError && <div className="settings-key-error">{inviteError}</div>}
+                </div>
+              )}
             </>
           )}
         </div>

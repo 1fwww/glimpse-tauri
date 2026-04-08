@@ -50,7 +50,7 @@ export default function ChatOnlyApp() {
   if (!tm.currentThread) return null
 
   return (
-    <div className={`chat-only-app ${isPinned ? 'theme-light' : ''}`}>
+    <div className={`chat-only-app ${isPinned ? 'pinned' : ''}`}>
       <ChatPanel
         style={{}}
         croppedImage={croppedImage}

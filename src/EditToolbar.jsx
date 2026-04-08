@@ -11,13 +11,13 @@ const tools = [
 ]
 
 const colors = [
-  '#DC3545', // red
-  '#E08700', // amber
-  '#06B6D4', // cyan
-  '#1E40AF', // blue
-  '#EC4899', // pink
-  '#000000', // black
-  '#ffffff', // white
+  { hex: '#DC3545', name: 'Red' },
+  { hex: '#E08700', name: 'Amber' },
+  { hex: '#06B6D4', name: 'Cyan' },
+  { hex: '#1E40AF', name: 'Blue' },
+  { hex: '#EC4899', name: 'Pink' },
+  { hex: '#000000', name: 'Black' },
+  { hex: '#ffffff', name: 'White' },
 ]
 const sizes = [2, 4, 6]
 const fontSizes = [8, 12, 16, 20, 28, 36, 48, 60, 72, 96]
@@ -158,6 +158,7 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
       <div className="edit-toolbar-tools" onMouseLeave={() => setTooltip(null)}>
         <button
           className="edit-tool-btn"
+          aria-label="Settings"
           onClick={(e) => {
             const panel = document.querySelector('.chat-panel')
             const el = panel || e.currentTarget.closest('.edit-toolbar')
@@ -176,6 +177,8 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
           <button
             key={tool.id}
             className={`edit-tool-btn ${activeTool === tool.id ? 'active' : ''}`}
+            aria-label={tool.label}
+            aria-pressed={activeTool === tool.id}
             onClick={() => {
               const newTool = activeTool === tool.id ? null : tool.id
               // Save current size for the tool type we're leaving
@@ -199,6 +202,7 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
 
         <button
           className={`edit-tool-btn ${!canUndo ? 'disabled' : ''}`}
+          aria-label="Undo"
           onClick={undo}
           onMouseEnter={(e) => { setTooltip('Undo'); setTooltipX(e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2) }}
         >
@@ -208,10 +212,11 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
         </button>
         <button
           className={`edit-tool-btn ${!canUndo ? 'disabled' : ''}`}
+          aria-label="Clear all annotations"
           onClick={clearAll}
           onMouseEnter={(e) => { setTooltip('Clear all annotations'); setTooltipX(e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2) }}
         >
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '11px' }}>Reset</span>
+          <span className="edit-tool-label">Reset</span>
         </button>
 
         <span className="edit-toolbar-sep" />
@@ -219,11 +224,12 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
         <button
           ref={copyBtnRef}
           className={`edit-tool-btn edit-tool-primary ${copyFeedback ? 'copied' : ''}`}
+          aria-label="Copy"
           onClick={onCopy}
           onMouseEnter={(e) => { setTooltip(copyFeedback ? 'Copied to clipboard' : 'Copy'); setTooltipX(e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2) }}
         >
           {copyFeedback ? (
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#34c759" strokeWidth="2">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2DA44E" strokeWidth="2">
               <path d="M20 6L9 17l-5-5" />
             </svg>
           ) : (
@@ -235,11 +241,12 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
         <button
           ref={saveBtnRef}
           className={`edit-tool-btn edit-tool-primary ${saveFeedback ? 'copied' : ''}`}
+          aria-label="Save"
           onClick={onSave}
           onMouseEnter={(e) => { setTooltip(saveFeedback ? 'Saved' : 'Save'); setTooltipX(e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2) }}
         >
           {saveFeedback ? (
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#34c759" strokeWidth="2">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2DA44E" strokeWidth="2">
               <path d="M20 6L9 17l-5-5" />
             </svg>
           ) : (
@@ -253,6 +260,7 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
 
         <button
           className="edit-tool-btn edit-tool-cancel"
+          aria-label="Cancel"
           onClick={onClose}
           onMouseEnter={(e) => { setTooltip('Cancel'); setTooltipX(e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2) }}
         >
@@ -273,13 +281,16 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
       {/* AI chat toggle — visually separate circle */}
       <button
         className={`edit-ai-toggle ${!chatMinimized ? 'active' : ''}`}
+        aria-label={chatMinimized ? 'Open AI chat' : 'Minimize chat'}
         onClick={() => { onToggleChat(); setSuppressAiTip(true); setTimeout(() => setSuppressAiTip(false), 3000) }}
         onMouseDown={(e) => e.stopPropagation()}
         {...(!suppressAiTip ? { 'data-tip': chatMinimized ? 'Ask AI' : 'Minimize chat' } : {})}
       >
         {chatMinimized ? (
-          <svg viewBox="60 140 420 280" width="30" height="20">
-            <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+          <svg className="edit-ai-eye" viewBox="60 140 420 280" width="30" height="20">
+            <g className="edit-ai-brow">
+              <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+            </g>
             <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
           </svg>
         ) : (
@@ -332,20 +343,22 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
       {((showOptions && activeTool && activeTool !== 'mosaic') || selectedIndex !== null) && (
         <div className="edit-toolbar-options">
           <div className="edit-color-picker">
-            {colors.map(c => {
+            {colors.map(({ hex, name }) => {
               const isActive = selectedIndex !== null && annotations[selectedIndex]
-                ? annotations[selectedIndex].color === c
-                : activeColor === c
+                ? annotations[selectedIndex].color === hex
+                : activeColor === hex
               return (
                 <button
-                  key={c}
+                  key={hex}
                   className={`edit-color-dot ${isActive ? 'active' : ''}`}
-                  style={{ background: c }}
+                  style={{ background: hex }}
+                  aria-label={name}
+                  aria-pressed={isActive}
                   onClick={() => {
-                    setActiveColor(c)
+                    setActiveColor(hex)
                     if (selectedIndex !== null) {
                       commitAnnotations(prev => prev.map((ann, i) =>
-                        i === selectedIndex ? { ...ann, color: c } : ann
+                        i === selectedIndex ? { ...ann, color: hex } : ann
                       ))
                     }
                   }}

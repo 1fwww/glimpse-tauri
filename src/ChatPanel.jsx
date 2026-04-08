@@ -4,10 +4,14 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import ApiKeySetup from './ApiKeySetup'
 
-const GlimpseIcon = ({ size = 20 }) => (
+const BROW_RESTING = "M98 212C152 174 365 158 420 248"
+const BROW_FOCUSED = "M98 192C200 192 350 204 420 234"
+
+const GlimpseIcon = ({ size = 20, focused = false }) => (
   <svg viewBox="60 140 420 280" width={size} height={Math.round(size * 280 / 420)}>
-    {/* Eyebrow — first path, targeted by CSS animation */}
-    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+    {/* Eyebrow — crossfade between resting and focused */}
+    <path d={BROW_RESTING} fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: focused ? 0 : 1, transition: 'opacity 0.3s ease' }} />
+    <path d={BROW_FOCUSED} fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: focused ? 1 : 0, transition: 'opacity 0.3s ease' }} />
     <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
   </svg>
 )
@@ -15,6 +19,13 @@ const GlimpseIcon = ({ size = 20 }) => (
 function Tooltip({ text, children }) {
   const [pos, setPos] = useState(null)
   const ref = useRef(null)
+  // Dismiss tooltip when window loses focus (mouse may leave without onMouseLeave)
+  useEffect(() => {
+    if (!pos) return
+    const dismiss = () => setPos(null)
+    window.addEventListener('blur', dismiss)
+    return () => window.removeEventListener('blur', dismiss)
+  }, [pos])
   return (
     <span
       ref={ref}
@@ -526,6 +537,9 @@ export default function ChatPanel({
   const threadTitle = currentThread?.title || 'New Chat'
   const showScrollDown = !isAtBottom && !isLoading
   const [eyebrowWiggle, setEyebrowWiggle] = useState(false)
+  const [eyeAnim, setEyeAnim] = useState('') // 'blink' | 'draw' | ''
+  const [titleAnim, setTitleAnim] = useState(0)
+  const triggerTitleAnim = () => setTitleAnim(k => k + 1)
 
 
   // Draggable panel
@@ -623,42 +637,46 @@ export default function ChatPanel({
       {/* Header — drag handle */}
       <div className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
         <span
-          className={`glimpse-icon-fixed ${eyebrowWiggle ? 'glimpse-loading' : ''}`}
+          className={`glimpse-icon-fixed ${eyeAnim === 'blink' ? 'logo-blink playing' : eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-blink playing' : ''}`}
           onClick={(e) => {
             e.stopPropagation()
-            if (!isLoading) {
+            if (!isLoading && !eyeAnim) {
+              setEyebrowWiggle(false)
+              void e.currentTarget.offsetWidth
               setEyebrowWiggle(true)
-              setTimeout(() => setEyebrowWiggle(false), 1200)
+              setTimeout(() => setEyebrowWiggle(false), 900)
             }
           }}
           style={{ cursor: 'pointer' }}
         >
-          <GlimpseIcon size={24} />
+          <GlimpseIcon size={24} focused={isPinned} />
         </span>
         <div className="chat-header-info" style={{ position: 'relative' }}>
           <button
             className="chat-header-title-btn"
             onClick={() => { if (!threadMenuOpen) refreshThreads(); setThreadMenuOpen(!threadMenuOpen) }}
-            title="Switch thread"
+            aria-label="Switch thread"
+            aria-expanded={threadMenuOpen}
+            aria-haspopup="menu"
           >
-            <span className="chat-header-title">{threadTitle}</span>
+            <span className={`chat-header-title ${titleAnim ? 'title-reveal' : ''}`} key={titleAnim}>{threadTitle}</span>
             <svg className={`chat-header-chevron ${threadMenuOpen ? 'open' : ''}`} viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
           {threadMenuOpen && (
             <>
-              <div className="thread-menu-popup header-popup">
+              <div className="thread-menu-popup header-popup" role="menu" aria-label="Thread history">
                 {recentThreads.filter(t => t.id !== currentThread?.id).length > 0 ? (
                   <>
                     {recentThreads.filter(t => t.id !== currentThread?.id).slice(0, 3).map(t => (
-                      <button key={t.id} className="thread-menu-item" onClick={() => { onThreadChange(t); setThreadMenuOpen(false) }} title={t.title}>
+                      <button key={t.id} className="thread-menu-item" role="menuitem" onClick={() => { onThreadChange(t); setThreadMenuOpen(false); triggerTitleAnim() }} title={t.title}>
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                         <span>{t.title}</span>
                       </button>
                     ))}
                     <div className="thread-menu-divider" />
-                    <button className="thread-menu-item thread-menu-clear" onClick={() => { onClearAllThreads(); setThreadMenuOpen(false) }}>
+                    <button className="thread-menu-item thread-menu-clear" role="menuitem" onClick={() => { onClearAllThreads(); setThreadMenuOpen(false) }}>
                       <span>Clear all chats</span>
                     </button>
                   </>
@@ -672,7 +690,7 @@ export default function ChatPanel({
         <Tooltip text="New chat">
           <button
             className="chat-header-new"
-            onClick={onNewThread}
+            onClick={() => { onNewThread(); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim() }}
             aria-label="New chat"
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
@@ -682,11 +700,15 @@ export default function ChatPanel({
         </Tooltip>
         {(onTogglePin || onPin) && (
           <>
-          <div className="chat-header-sep" />
           <Tooltip text={isPinned ? 'Unpin' : 'Pin to screen'}>
             <button
               className={`chat-header-pin ${isPinned ? 'pinned' : ''}`}
-              onClick={onTogglePin || (() => onPin({ screenshotAttached }))}
+              onClick={() => {
+                const handler = onTogglePin || (() => onPin({ screenshotAttached }))
+                handler()
+                // Eye blink on pin
+                if (!isPinned) { setEyeAnim('blink'); setTimeout(() => setEyeAnim(''), 900) }
+              }}
               disabled={isLoading}
               aria-label={isPinned ? 'Unpin' : 'Pin to screen'}
             >
@@ -754,9 +776,11 @@ export default function ChatPanel({
                         a: ({ href, children }) => (
                           <a href={href} onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(href) }}>{children}</a>
                         ),
-                        code: ({ inline, className, children }) => {
+                        code: ({ className, children, node }) => {
                           const text = String(children).replace(/\n$/, '')
-                          if (inline) {
+                          // Detect fenced code block: has language-* className
+                          const isBlock = /language-/.test(className || '')
+                          if (!isBlock) {
                             return (
                               <code
                                 className="inline-code-copy"
@@ -772,7 +796,7 @@ export default function ChatPanel({
                           const lang = className?.replace('language-', '') || ''
                           return (
                             <div className="code-block-wrapper">
-                              <div className="code-block-header">
+                              {lang && <div className="code-block-header">
                                 <span className="code-block-lang">{lang}</span>
                                 <button className="code-block-copy" onClick={(e) => {
                                   navigator.clipboard.writeText(text)
@@ -782,12 +806,38 @@ export default function ChatPanel({
                                 }} aria-label="Copy code">
                                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                 </button>
-                              </div>
-                              <code className={className}>{children}</code>
+                              </div>}
+                              {!lang && <button className="code-block-copy code-block-copy-float" onClick={(e) => {
+                                navigator.clipboard.writeText(text)
+                                const btn = e.currentTarget
+                                btn.classList.add('copied')
+                                setTimeout(() => btn.classList.remove('copied'), 800)
+                              }} aria-label="Copy code">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                              </button>}
+                              <pre><code>{children}</code></pre>
                             </div>
                           )
                         },
-                        pre: ({ children }) => <pre>{children}</pre>,
+                        pre: ({ children }) => {
+                          // If code component already rendered a wrapper, unwrap
+                          if (children?.props?.className === 'code-block-wrapper') return children
+                          // Plain code block without language — wrap it ourselves
+                          const text = typeof children?.props?.children === 'string' ? children.props.children.replace(/\n$/, '') : ''
+                          return (
+                            <div className="code-block-wrapper">
+                              <button className="code-block-copy code-block-copy-float" onClick={(e) => {
+                                navigator.clipboard.writeText(text)
+                                const btn = e.currentTarget
+                                btn.classList.add('copied')
+                                setTimeout(() => btn.classList.remove('copied'), 800)
+                              }} aria-label="Copy code">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                              </button>
+                              <pre><code>{children?.props?.children}</code></pre>
+                            </div>
+                          )
+                        },
                         blockquote: ({ children }) => {
                           const ref = React.createRef()
                           return (
@@ -885,6 +935,7 @@ export default function ChatPanel({
             placeholder={isNewThread ? (croppedImage ? 'Ask about this screenshot...' : 'Start a conversation...') : 'Continue discussion...'}
             rows={2}
             disabled={showApiKeySetup}
+            aria-label="Message input"
           />
           <button className="chat-send-arrow" onClick={() => sendMessage()} disabled={isLoading || (!input.trim() && !textContext && !(screenshotAttached && croppedImage)) || showApiKeySetup} aria-label="Send message">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -912,8 +963,8 @@ export default function ChatPanel({
             </svg>
           </button>
         </Tooltip>
-        {onClose && (!croppedImage || isPinned) && (
-          <button className="thread-action-link thread-action-esc" onClick={onClose}>
+        {onClose && (chatFullSize || !croppedImage) && (
+          <button className="thread-action-link thread-action-esc" onClick={onClose} aria-label="Close panel">
             <kbd className="thread-action-kbd">Esc</kbd> to close
           </button>
         )}
@@ -927,6 +978,9 @@ export default function ChatPanel({
               <div className="model-selector" ref={modelSelectorRef}>
                 <button
                   className="thread-action-link model-link"
+                  aria-label="Select model"
+                  aria-expanded={modelMenuOpen}
+                  aria-haspopup="menu"
                   onClick={() => {
                     if (!modelMenuOpen) {
                       const r = modelSelectorRef.current?.getBoundingClientRect()
@@ -942,7 +996,7 @@ export default function ChatPanel({
                 </button>
                 {modelMenuOpen && modelMenuPos && (() => {
                   return ReactDOM.createPortal(
-                    <div className={`model-dropdown ${isPinned ? 'theme-light' : ''}`} style={{ position: 'fixed', bottom: modelMenuPos.bottom, right: modelMenuPos.right }}>
+                    <div className="model-dropdown" role="menu" aria-label="Model selection" style={{ position: 'fixed', bottom: modelMenuPos.bottom, right: modelMenuPos.right }}>
                       {availableProviders.map(p => (
                         <div key={p.id}>
                           <div className="model-dropdown-provider">{p.name}</div>
@@ -950,6 +1004,8 @@ export default function ChatPanel({
                             <button
                               key={m.id}
                               className={`model-dropdown-item ${m.id === modelId ? 'active' : ''}`}
+                              role="menuitem"
+                              aria-current={m.id === modelId ? 'true' : undefined}
                               onClick={() => {
                                 setProvider(p.id)
                                 setModelId(m.id)
