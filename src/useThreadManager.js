@@ -82,6 +82,7 @@ export default function useThreadManager() {
     setRecentThreads([])
     setCurrentThread(newThread())
     setIsNewThread(true)
+    window.electronAPI?.refreshTrayMenu?.()
   }, [recentThreads])
 
   // Refresh threads with time heuristic (called by overlay on screen capture)

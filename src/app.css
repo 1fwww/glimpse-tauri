@@ -342,9 +342,9 @@
   width: 100% !important;
   height: 100% !important;
   max-height: none !important;
-  border: 1px solid transparent;
+  border: none;
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: none !important;
   animation: none;
   transform: none;
   transition: background 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1), padding 0.45s cubic-bezier(0.22, 1, 0.36, 1);
@@ -353,7 +353,7 @@
 /* Chat-only pinned — frosted glass atmosphere, content tightens inward */
 .chat-only-app .chat-panel.pinned-panel {
   transform: none;
-  border: 1px solid transparent;
+  border: none;
   padding: 2px;
   background: var(--surface-pinned);
   box-shadow:
@@ -480,11 +480,8 @@
 
 
 .chat-panel-new {
-  border-color: rgba(200, 240, 255, 0.25);
-  box-shadow:
-    0 0 2px rgba(200, 240, 255, 0.3),
-    0 4px 24px rgba(0, 0, 0, 0.5),
-    0 12px 48px rgba(0, 0, 0, 0.3);
+  border-color: var(--brand-border);
+  box-shadow: var(--shadow-lg);
 }
 
 @keyframes panelSlideIn {
@@ -2686,13 +2683,6 @@
   border-bottom: 1px solid var(--border-dim);
 }
 
-/* Dim everything except pin button to create hierarchy */
-.pin-demo-header svg:first-child,
-.pin-demo-title,
-.pin-demo-messages,
-.pin-demo-input {
-  opacity: 0.3;
-}
 
 .pin-demo-pinned .pin-demo-header {
   border-bottom-color: rgba(108, 99, 255, 0.08);
@@ -2709,13 +2699,13 @@
 }
 
 .pin-demo-pin {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--brand-border);
+  border: 1.5px solid var(--brand-border);
   background: var(--brand-dim);
   color: var(--brand-text);
   cursor: pointer;

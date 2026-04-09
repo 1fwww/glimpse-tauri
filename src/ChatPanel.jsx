@@ -362,6 +362,7 @@ export default function ChatPanel({
         ),
       })),
     })
+    window.electronAPI?.refreshTrayMenu?.()
   }, [setCurrentThread])
 
   const generateTitle = useCallback(async (msgs) => {

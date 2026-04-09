@@ -17,6 +17,11 @@ export default function WelcomeApp() {
   const [pinnedEgg, setPinnedEgg] = useState(false)
   const [showPermSkip, setShowPermSkip] = useState(false)
 
+  // When entering step 1, immediately check permissions
+  useEffect(() => {
+    if (step === 1) checkPermissions()
+  }, [step === 1])
+
   // Show skip links after 5 seconds on permission/shortcut steps
   useEffect(() => {
     if (step === 1) {
@@ -48,14 +53,14 @@ export default function WelcomeApp() {
   }
 
   useEffect(() => {
-    // On mount, check permissions and force back to step 1 if not granted
-    checkPermissions().then(result => {
+    // On mount (slight delay to ensure Tauri bridge ready), check permissions
+    const init = setTimeout(() => checkPermissions().then(result => {
       if (result && (!result.screen || !result.accessibility)) {
         setStep(prev => prev > 1 ? 1 : prev)
       }
-    })
+    }), 100)
     const interval = setInterval(checkPermissions, 2000)
-    return () => clearInterval(interval)
+    return () => { clearTimeout(init); clearInterval(interval) }
   }, [])
 
   useEffect(() => {

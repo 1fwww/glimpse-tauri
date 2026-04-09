@@ -69,6 +69,7 @@ if (window.__TAURI_INTERNALS__ && !window.electronAPI) {
     togglePin: () => invoke('toggle_pin'),
     showToast: (message) => invoke('show_toast', { message }),
     notifyProvidersChanged: () => invoke('notify_providers_changed'),
+    refreshTrayMenu: () => invoke('refresh_tray_menu'),
     resizeChatWindow: (size) => invoke('resize_chat_window', { size }),
     selectFolder: () => invoke('select_folder'),
     copyImage: (dataUrl) => invoke('copy_image', { dataUrl }),

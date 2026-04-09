@@ -4,10 +4,52 @@ mod native_mac;
 mod windows;
 
 use std::fs;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, AppHandle};
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{TrayIconBuilder, TrayIconId};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+
+fn build_tray_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
+    let screenshot_i = MenuItem::with_id(app, "screenshot", "Screenshot    ⌘⇧Z", true, None::<&str>)?;
+    let chat_i = MenuItem::with_id(app, "chat", "Text Chat    ⌘⇧X", true, None::<&str>)?;
+    let settings_i = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
+    let quit_i = MenuItem::with_id(app, "quit", "Quit Glimpse", true, None::<&str>)?;
+
+    let threads = commands::threads::get_threads().unwrap_or_default();
+    let mut menu_items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> = Vec::new();
+    menu_items.push(Box::new(screenshot_i));
+    menu_items.push(Box::new(chat_i));
+
+    if !threads.is_empty() {
+        menu_items.push(Box::new(MenuItem::with_id(app, "sep_chats", "", false, None::<&str>)?));
+        menu_items.push(Box::new(MenuItem::with_id(app, "recent_header", "Recent Chats", false, None::<&str>)?));
+        for (i, t) in threads.iter().take(5).enumerate() {
+            let title = t.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled");
+            let truncated = if title.len() > 30 { format!("{}...", &title[..27]) } else { title.to_string() };
+            menu_items.push(Box::new(MenuItem::with_id(app, &format!("thread_{}", i), &truncated, true, None::<&str>)?));
+        }
+    } else {
+        menu_items.push(Box::new(MenuItem::with_id(app, "sep_chats", "", false, None::<&str>)?));
+        menu_items.push(Box::new(MenuItem::with_id(app, "no_chats", "No recent chats yet", false, None::<&str>)?));
+    }
+
+    menu_items.push(Box::new(MenuItem::with_id(app, "sep_settings", "", false, None::<&str>)?));
+    menu_items.push(Box::new(settings_i));
+    menu_items.push(Box::new(MenuItem::with_id(app, "sep_quit", "", false, None::<&str>)?));
+    menu_items.push(Box::new(quit_i));
+
+    let refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = menu_items.iter().map(|b| b.as_ref()).collect();
+    Ok(Menu::with_items(app, &refs)?)
+}
+
+#[tauri::command]
+fn refresh_tray_menu(app: AppHandle) {
+    if let Ok(menu) = build_tray_menu(&app) {
+        if let Some(tray) = app.tray_by_id(&TrayIconId::new("glimpse-tray")) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    }
+}
 
 pub fn run() {
     tauri::Builder::default()
@@ -59,6 +101,7 @@ pub fn run() {
             windows::save_image,
             // Screenshot
             trigger_screenshot,
+            refresh_tray_menu,
             overlay_pong,
             windows::close_overlay,
         ])
@@ -99,17 +142,13 @@ pub fn run() {
                 let _ = windows::prewarm_overlay(&app_prewarm);
             });
 
-            // Tray icon — additive, does not replace Home window
-            let screenshot_i = MenuItem::with_id(app, "screenshot", "Screenshot    ⌘⇧Z", true, None::<&str>)?;
-            let chat_i = MenuItem::with_id(app, "chat", "Text Chat    ⌘⇧X", true, None::<&str>)?;
-            let settings_i = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit Glimpse", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&screenshot_i, &chat_i, &settings_i, &quit_i])?;
+            // Tray icon
+            let tray_menu = build_tray_menu(app.handle())?;
 
             let app_tray = app.handle().clone();
             let tray_icon_bytes = include_bytes!("../icons/tray-icon.png");
             let tray_icon = tauri::image::Image::from_bytes(tray_icon_bytes).expect("failed to load tray icon");
-            let _ = TrayIconBuilder::new()
+            let _ = TrayIconBuilder::with_id("glimpse-tray")
                 .icon(tray_icon)
                 .icon_as_template(true)
                 .menu(&tray_menu)
@@ -121,11 +160,26 @@ pub fn run() {
                         let _ = windows::create_welcome_window(&app_tray);
                         return;
                     }
-                    match event.id.as_ref() {
+                    let id = event.id.as_ref().to_string();
+                    match id.as_str() {
                         "screenshot" => handle_screenshot_shortcut(&app_tray),
                         "chat" => handle_chat_shortcut(&app_tray),
                         "settings" => { let _ = windows::create_settings_window(&app_tray, None); },
                         "quit" => std::process::exit(0),
+                        _ if id.starts_with("thread_") => {
+                            // Open thread by index
+                            if let Ok(idx) = id.replace("thread_", "").parse::<usize>() {
+                                let threads = commands::threads::get_threads().unwrap_or_default();
+                                if let Some(thread) = threads.get(idx) {
+                                    if let Some(thread_id) = thread.get("id").and_then(|v| v.as_str()) {
+                                        let _ = windows::create_chat_window(&app_tray);
+                                        if let Some(w) = app_tray.get_webview_window("chat") {
+                                            let _ = w.emit("load-thread-data", thread);
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         _ => {}
                     }
                 })
