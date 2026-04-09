@@ -1291,8 +1291,8 @@
   color: var(--text-secondary);
   font-family: var(--font-display);
   font-size: var(--text-xs);
-  padding: 3px 8px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -1455,8 +1455,8 @@
   color: var(--text-secondary);
   font-family: var(--font-display);
   font-size: var(--text-xs);
-  padding: 3px 8px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   pointer-events: none;
   animation: tooltipFadeIn 0.1s ease-out;
@@ -1813,13 +1813,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: var(--text-sm);
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -2012,13 +2012,13 @@
 /* ─── Custom Tooltips (fixed position, no layout impact) ─── */
 .chat-tooltip {
   position: fixed;
-  padding: 3px 8px;
+  padding: 4px 8px;
   background: var(--surface-deep);
   border: 1px solid var(--border-dim);
   color: var(--text-secondary);
   font-family: var(--font-display);
   font-size: var(--text-xs);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   pointer-events: none;
   z-index: 10000;
@@ -3666,8 +3666,8 @@
 }
 
 .theme-light .scroll-to-bottom {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: rgba(0, 0, 0, 0.1);
+  background: var(--surface-elevated);
+  border-color: var(--border-active);
   color: var(--text-secondary);
 }
 
