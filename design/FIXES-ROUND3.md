@@ -21,7 +21,7 @@
 **Layout:**
 ```
 You're all set                                    ← title (18px, semibold)
-Glimpse runs in the background.                   ← subtitle (14px, secondary)
+Glimpse will run quietly in the background.        ← subtitle (14px, secondary)
 
 [tray icon reveal animation area]                 ← ~120px height
 
@@ -30,11 +30,11 @@ Find [inline tray icon SVG] in your menu bar.     ← hint (12px, dim, icon inli
 [Start Using Glimpse]                             ← CTA button (same solid brand style)
 ```
 
-**Animation sequence (auto-plays on step load):**
-1. **0-0.4s:** Full Glimpse eye fades in centered
-2. **0.7s:** Crop frame appears — **expands from top-left corner** to full size (like dragging a screenshot selection). 0.3s, `cubic-bezier(0.22, 1, 0.36, 1)`
-3. **0.7-1.4s:** Hold — user sees the frame highlighting the right side of the eye
-4. **1.4s:** SNAP — dim overlay + purple→black color change happen simultaneously. 0.1s. This is the "shutter" moment.
+**Animation sequence (auto-plays on step load) — UPDATED v5:**
+1. **0-0.3s:** Full Glimpse eye fades in (100% opacity — user already saw logo in Step 0)
+2. **0.5-1.1s:** Crop frame expands from top-left + **progressive purple→black reveal** inside frame (clip-path synced). 0.6s, `cubic-bezier(0.25, 0.1, 0.25, 1)`. **Mid-pause at 40%→55%** (human hesitation — same feel as Step 0).
+3. **1.1-1.5s:** Hold — user sees black inside frame, purple outside
+4. **1.5s:** Dim overlay fades in (0.15s). **Frame stays visible** (does NOT fade out — reinforces "eye behind a window" metaphor).
 5. **1.9s:** Hint text fades in with inline tray icon
 
 **The eye SVG:** Same paths as the polished logo.
@@ -71,7 +71,7 @@ Dark:  stroke="white"    (tray icon is light on dark menu bar)
 <span> in your menu bar.</span>
 ```
 
-**Reference:** `design/mockups/tray-intro-v4.html` — the welcome section at the bottom shows the full animation.
+**Reference:** `design/mockups/tray-intro-v5.html` — open in browser and click "Play" to see the full animation.
 
 ---
 
