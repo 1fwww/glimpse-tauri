@@ -133,6 +133,7 @@ export default function SettingsApp() {
 
   return (
     <div className="settings-app">
+      <div className="settings-inner">
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
         <button className="settings-close" onClick={handleClose} aria-label="Close settings">
@@ -301,6 +302,7 @@ export default function SettingsApp() {
       <div className="settings-footer">
         <span className="settings-version">Glimpse v0.2.0</span>
         <button className="settings-esc-btn" onClick={handleClose}><kbd>Esc</kbd> to close</button>
+      </div>
       </div>
     </div>
   )

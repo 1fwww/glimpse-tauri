@@ -111,6 +111,7 @@ export default function WelcomeApp() {
 
   return (
     <div className="welcome-app">
+      <div className="welcome-inner">
       <h1 className="sr-only">Glimpse Setup</h1>
       <div className="welcome-drag-bar">
         <button className="welcome-close" onClick={handleClose} aria-label="Close">
@@ -347,6 +348,7 @@ export default function WelcomeApp() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

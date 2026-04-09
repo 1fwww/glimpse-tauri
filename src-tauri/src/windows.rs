@@ -46,8 +46,8 @@ pub fn create_welcome_window(app: &AppHandle) -> Result<(), Box<dyn std::error::
 
     let win = WebviewWindowBuilder::new(app, "welcome", WebviewUrl::App("index.html#welcome".into()))
         .title("Welcome to Glimpse")
-        .inner_size(400.0, 510.0)
-        .position(x, y)
+        .inner_size(412.0, 522.0)  // +12 for 6px padding each side
+        .position(x - 6.0, y - 6.0)
         .resizable(false)
         .decorations(false)
         .transparent(true)
@@ -115,8 +115,8 @@ pub fn create_settings_window(app: &AppHandle, panel_bounds: Option<&serde_json:
 
     let win = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html#settings".into()))
         .title("Settings")
-        .inner_size(420.0, 520.0)
-        .position(x, y)
+        .inner_size(432.0, 532.0)  // +12 for 6px padding each side
+        .position(x - 6.0, y - 6.0)
         .resizable(false)
         .decorations(false)
         .transparent(true)
@@ -149,7 +149,7 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
     }
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
-        .inner_size(420.0, 400.0)
+        .inner_size(432.0, 412.0)  // +12 for 6px padding each side
         .resizable(true)
         .decorations(false)
         .transparent(true)

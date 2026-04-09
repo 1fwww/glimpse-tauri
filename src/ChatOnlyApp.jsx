@@ -10,7 +10,7 @@ export default function ChatOnlyApp() {
   const tm = useThreadManager()
 
   useEffect(() => {
-    window.electronAPI?.onTextContext?.((text) => setInitialContext(prev => ({ text, seq: prev.seq + 1 })))
+    window.electronAPI?.onTextContext?.((text) => setInitialContext(prev => ({ text: text?.trim() || '', seq: prev.seq + 1 })))
     window.electronAPI?.onPinState?.((state) => setIsPinned(state))
     window.electronAPI?.onSetCroppedImage?.((img) => setCroppedImage(img))
     // Receive full thread data from pin (no disk read needed)
@@ -50,7 +50,8 @@ export default function ChatOnlyApp() {
   if (!tm.currentThread) return null
 
   return (
-    <div className={`chat-only-app ${isPinned ? 'pinned' : ''}`}>
+    <div className="chat-only-app">
+      <div className={`chat-only-inner ${isPinned ? 'pinned' : ''}`}>
       <ChatPanel
         style={{}}
         croppedImage={croppedImage}
@@ -80,6 +81,7 @@ export default function ChatOnlyApp() {
         isPinned={isPinned}
         onTogglePin={() => window.electronAPI?.togglePin?.()}
       />
+      </div>
     </div>
   )
 }

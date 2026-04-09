@@ -140,6 +140,10 @@ pub fn run() {
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 let _ = windows::prewarm_overlay(&app_prewarm);
+                // Pre-warm System Events for text quoting (avoids cold-start delay on first Cmd+Shift+X)
+                let _ = std::process::Command::new("osascript")
+                    .args(["-e", r#"tell application "System Events" to return"#])
+                    .output();
             });
 
             // Tray icon
@@ -473,15 +477,18 @@ fn grab_selected_text() -> String {
             c.wait()
         });
 
+    // Small delay to ensure clipboard is cleared before Cmd+C
+    std::thread::sleep(std::time::Duration::from_millis(20));
+
     // Simulate Cmd+C
     let _ = Command::new("osascript")
         .args(["-e", r#"tell application "System Events" to keystroke "c" using command down"#])
         .output();
 
-    // Poll clipboard for the new content
+    // Poll clipboard for the new content (more attempts, longer wait)
     let mut selected = String::new();
-    for _ in 0..10 {
-        std::thread::sleep(std::time::Duration::from_millis(30));
+    for _ in 0..20 {
+        std::thread::sleep(std::time::Duration::from_millis(40));
         if let Ok(output) = Command::new("pbpaste").output() {
             let text = String::from_utf8_lossy(&output.stdout).to_string();
             if !text.is_empty() {
