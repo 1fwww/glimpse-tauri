@@ -2970,43 +2970,63 @@
   color: var(--text-secondary);
 }
 
-/* ── Tray Reveal Animation (Welcome Step 4) ── */
-.tray-reveal {
+/* ── Tray Reveal v5 (Welcome Step 4) ── */
+.welcome-step-tray {
+  gap: 8px;
+}
+
+.tray-v5-stage {
   position: relative;
   width: 280px;
   height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 4px 0;
 }
 
-.tray-reveal-eye {
+.tray-v5-eye-container {
   position: relative;
   width: 100px;
   height: 67px;
   opacity: 0;
+  will-change: opacity;
 }
 
-.tray-reveal-crop {
+.tray-v5-crop-frame {
+  position: absolute;
+  top: 10px;
+  left: 40px;
+  width: 0px;
+  height: 0px;
+  border: 1.5px solid rgba(108, 99, 255, 0.8);
+  border-radius: 4px;
+  z-index: 5;
+  will-change: width, height;
+}
+
+.tray-v5-black-overlay {
   position: absolute;
   top: 10px;
   left: 40px;
   width: 52px;
   height: 52px;
-  border: 1.5px solid rgba(108, 99, 255, 0);
+  overflow: hidden;
   border-radius: 4px;
-  z-index: 5;
+  z-index: 4;
+  clip-path: inset(0 100% 100% 0);
+  will-change: clip-path;
 }
 
-.tray-reveal-dim {
+.tray-v5-dim-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100px;
   height: 67px;
   background: var(--surface-base);
-  opacity: 0;
   z-index: 3;
+  opacity: 0;
   clip-path: polygon(
     0% 0%, 100% 0%, 100% 100%, 0% 100%,
     0% 0%,
@@ -3019,22 +3039,9 @@
   );
 }
 
-.tray-reveal-snap {
+.tray-v5-hint {
   position: absolute;
-  top: 10px;
-  left: 40px;
-  width: 52px;
-  height: 52px;
-  opacity: 0;
-  z-index: 4;
-  overflow: hidden;
-  border-radius: 4px;
-  color: var(--text-primary);
-}
-
-.tray-reveal-hint {
-  position: absolute;
-  bottom: 8px;
+  bottom: 6px;
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-display);
@@ -3044,71 +3051,64 @@
   opacity: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
-.tray-reveal-hint-icon {
+.tray-v5-hint-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 4px;
-  background: var(--brand-dim);
+  padding: 1px 3px;
+  background: var(--surface-hover);
   border-radius: 3px;
   color: var(--text-secondary);
 }
 
-/* Animation sequence */
-.tray-reveal.playing .tray-reveal-eye {
-  animation: trayEyeIn 0.4s ease-out forwards;
+/* Animation: eye fades in at 100% */
+.playing-w .tray-v5-eye-container {
+  animation: trayV5EyeIn 0.3s ease-out forwards;
 }
-
-.tray-reveal.playing .tray-reveal-crop {
-  animation: trayCropExpand 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.7s forwards;
-}
-
-.tray-reveal.playing .tray-reveal-dim {
-  animation: trayDimIn 0.1s ease-out 1.4s forwards;
-}
-
-.tray-reveal.playing .tray-reveal-snap {
-  animation: traySnapIn 0.1s ease-out 1.4s forwards;
-}
-
-.tray-reveal.playing .tray-reveal-hint {
-  animation: trayHintIn 0.4s ease-out 1.9s forwards;
-}
-
-@keyframes trayEyeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes trayCropExpand {
-  0% {
-    border-color: rgba(108, 99, 255, 0.5);
-    width: 0px;
-    height: 0px;
-    opacity: 1;
-  }
-  100% {
-    border-color: rgba(108, 99, 255, 0.5);
-    width: 52px;
-    height: 52px;
-    opacity: 1;
-  }
-}
-
-@keyframes trayDimIn {
-  from { opacity: 0; }
-  to { opacity: 0.88; }
-}
-
-@keyframes traySnapIn {
+@keyframes trayV5EyeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes trayHintIn {
+/* Frame expands with human drag feel */
+.playing-w .tray-v5-crop-frame {
+  animation: trayV5CropExpand 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards;
+}
+@keyframes trayV5CropExpand {
+  0%   { width: 0px;  height: 0px;  opacity: 1; }
+  40%  { width: 26px; height: 26px; opacity: 1; }
+  55%  { width: 29px; height: 29px; opacity: 1; }
+  100% { width: 52px; height: 52px; opacity: 1; }
+}
+
+/* Progressive purple→black reveal — synced with frame */
+.playing-w .tray-v5-black-overlay {
+  animation: trayV5RevealExpand 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards;
+}
+@keyframes trayV5RevealExpand {
+  0%   { clip-path: inset(0 100% 100% 0); }
+  40%  { clip-path: inset(0 50% 50% 0); }
+  55%  { clip-path: inset(0 44.2% 44.2% 0); }
+  100% { clip-path: inset(0 0% 0% 0); }
+}
+
+/* Dim outside — after hold */
+.playing-w .tray-v5-dim-overlay {
+  animation: trayV5DimIn 0.15s ease-out 1.5s forwards;
+}
+@keyframes trayV5DimIn {
+  from { opacity: 0; }
+  to { opacity: 0.88; }
+}
+
+/* Hint fades in */
+.playing-w .tray-v5-hint {
+  animation: trayV5HintIn 0.4s ease-out 1.9s forwards;
+}
+@keyframes trayV5HintIn {
   from { opacity: 0; transform: translateX(-50%) translateY(4px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }

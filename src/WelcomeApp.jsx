@@ -299,29 +299,34 @@ export default function WelcomeApp() {
         )}
 
         {step === 4 && (
-          <div className={`welcome-step step-${stepDirection}`}>
+          <div className={`welcome-step step-${stepDirection} welcome-step-tray`}>
             <h2 className="welcome-subtitle">You're all set</h2>
-            <p className="welcome-desc">Glimpse lives in your menu bar.</p>
+            <p className="welcome-desc">Glimpse will run quietly in the background.</p>
 
-            <div className="tray-reveal playing" key="tray-reveal">
-              <div className="tray-reveal-eye">
-                <svg viewBox="60 140 420 280" width={100} height={67}>
-                  <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
-                  <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
+            <div className="tray-v5-stage playing-w">
+              <div className="tray-v5-eye-container">
+                {/* Full purple eye — 100% opacity */}
+                <svg viewBox="60 140 420 280" width={100} height={67} aria-hidden="true">
+                  <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="var(--brand)" strokeWidth="20" strokeLinecap="round" />
+                  <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="var(--brand)" strokeWidth="22" strokeLinecap="round" />
                 </svg>
-                <div className="tray-reveal-crop" />
-                <div className="tray-reveal-dim" />
-                <div className="tray-reveal-snap">
-                  <svg viewBox="230 180 220 220" width={52} height={52}>
-                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="currentColor" strokeWidth="22" strokeLinecap="round" />
-                    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="24" strokeLinecap="round" />
+                {/* Selection frame */}
+                <div className="tray-v5-crop-frame" />
+                {/* Black tray icon overlay — progressive reveal */}
+                <div className="tray-v5-black-overlay">
+                  <svg viewBox="230 180 220 220" width={52} height={52} aria-hidden="true">
+                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="var(--text-primary)" strokeWidth="22" strokeLinecap="round" />
+                    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="var(--text-primary)" strokeWidth="24" strokeLinecap="round" />
                   </svg>
                 </div>
+                {/* Dim overlay */}
+                <div className="tray-v5-dim-overlay" />
               </div>
-              <div className="tray-reveal-hint">
+              {/* Hint */}
+              <div className="tray-v5-hint">
                 <span>Find</span>
-                <span className="tray-reveal-hint-icon">
-                  <svg viewBox="230 180 220 220" width={12} height={9}>
+                <span className="tray-v5-hint-icon">
+                  <svg viewBox="230 180 220 220" width={12} height={9} aria-hidden="true">
                     <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round" />
                     <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" />
                   </svg>
