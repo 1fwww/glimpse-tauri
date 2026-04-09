@@ -3,12 +3,28 @@ import './app.css'
 
 export default function WelcomeApp() {
   const [step, setStep] = useState(() => {
-    // Check if onboarding was previously completed (stale localStorage after reinstall)
-    // welcome window only opens when onboarding-done file doesn't exist,
-    // so if step was saved as 3+ (completed), it's stale — reset to 0
+    // Distinguish mid-onboarding resume vs stale localStorage from previous install.
+    // Use a session timestamp — if recent (within 24h), trust saved step.
     const saved = localStorage.getItem('welcome-step')
+    const session = localStorage.getItem('welcome-session')
     const val = saved ? parseInt(saved, 10) : 0
-    return val > 4 ? 0 : val
+
+    if (!session) {
+      // No session — fresh install or first ever launch
+      localStorage.setItem('welcome-session', Date.now().toString())
+      return 0
+    }
+
+    const age = Date.now() - parseInt(session, 10)
+    if (age > 24 * 60 * 60 * 1000) {
+      // Session too old — stale from previous install
+      localStorage.setItem('welcome-session', Date.now().toString())
+      localStorage.removeItem('welcome-step')
+      return 0
+    }
+
+    // Recent session — resume where user left off
+    return val
   })
   const [permissions, setPermissions] = useState({ screen: false, accessibility: false })
   const [checking, setChecking] = useState(false)
@@ -254,6 +270,7 @@ export default function WelcomeApp() {
                   <span className="pin-demo-title">New Chat</span>
                   <div style={{ flex: 1 }} />
                   <button className={`pin-demo-pin ${pinnedEgg ? 'pin-demo-pin-active' : ''}`} onClick={(e) => { e.stopPropagation(); setPinnedEgg(p => !p) }}>
+                    {!pinnedEgg && <svg className="pin-demo-cursor" viewBox="0 0 24 24" width={12} height={12} fill="var(--text-secondary)" stroke="none"><path d="M5 3l14 8-6.5 1.5L11 19z"/></svg>}
                     <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ transform: pinnedEgg ? 'rotate(0deg)' : 'rotate(20deg)', transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
                       <path d="M12 17v5" /><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24z" />
                     </svg>
