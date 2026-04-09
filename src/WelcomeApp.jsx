@@ -32,6 +32,7 @@ export default function WelcomeApp() {
   const [showShortcutSkip, setShowShortcutSkip] = useState(false)
   const [pinnedEgg, setPinnedEgg] = useState(false)
   const [showPermSkip, setShowPermSkip] = useState(false)
+  const [splashKey, setSplashKey] = useState(0)
 
   // When entering step 1, immediately check permissions
   useEffect(() => {
@@ -122,25 +123,28 @@ export default function WelcomeApp() {
       </div>
       <div className="welcome-content">
         {step === 0 && (
-          <div className={`welcome-step step-${stepDirection}`}>
-            <div
-              className="welcome-logo glimpse-icon-fixed logo-draw-blink"
-              onClick={(e) => {
-                const el = e.currentTarget
-                el.classList.remove('logo-draw-blink')
-                void el.offsetWidth
-                el.classList.add('logo-draw-blink')
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <svg viewBox="60 140 420 280" width={64} height={43}>
-                <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
-                <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
-              </svg>
+          <div className="welcome-step welcome-step-splash">
+            <div className="w-stage" key={`eye-${splashKey}`}>
+              <div className="w-eye-container" onClick={() => setSplashKey(k => k + 1)} style={{ cursor: 'pointer' }}>
+                {/* Ghost eye — 35% opacity */}
+                <svg viewBox="60 140 420 280" width={100} height={67} aria-hidden="true" className="w-ghost-svg">
+                  <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="var(--brand)" strokeWidth="20" strokeLinecap="round" />
+                  <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="var(--brand)" strokeWidth="22" strokeLinecap="round" />
+                </svg>
+                {/* Selection frame */}
+                <div className="w-crop-frame" />
+                {/* Full-color overlay — clip-path reveal */}
+                <div className="w-white-overlay">
+                  <svg viewBox="60 140 420 280" width={100} height={67} aria-hidden="true">
+                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="var(--brand)" strokeWidth="20" strokeLinecap="round" className="w-blink-brow" />
+                    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="var(--brand)" strokeWidth="22" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <p className="welcome-title">Glimpse</p>
-            <p className="welcome-desc">Glimpse your screen. Stay in flow.</p>
-            <button className="welcome-btn" onClick={() => setStep(1)}>Get Started</button>
+            <p className="welcome-title w-title-anim">Glimpse</p>
+            <p className="welcome-desc w-desc-anim">Glimpse your screen. Stay in flow.</p>
+            <button className="welcome-btn w-btn-anim" onClick={() => setStep(1)}>Get Started</button>
           </div>
         )}
 

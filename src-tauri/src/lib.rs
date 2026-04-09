@@ -140,7 +140,11 @@ pub fn run() {
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 let _ = windows::prewarm_overlay(&app_prewarm);
-                // Pre-warm System Events for text quoting (avoids cold-start delay on first Cmd+Shift+X)
+            });
+
+            // Pre-warm System Events in separate thread (can be slow, don't block overlay)
+            std::thread::spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(2000));
                 let _ = std::process::Command::new("osascript")
                     .args(["-e", r#"tell application "System Events" to return"#])
                     .output();

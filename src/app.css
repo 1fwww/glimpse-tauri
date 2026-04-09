@@ -2329,6 +2329,126 @@
   border: 0;
 }
 
+/* ── Welcome Step 0: Capture Reveal Animation ── */
+.welcome-step-splash {
+  gap: 8px;
+}
+
+.w-stage {
+  position: relative;
+  width: 280px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.w-eye-container {
+  position: relative;
+  width: 100px;
+  height: 67px;
+  opacity: 1;
+}
+
+/* Ghost eye — fades in to 35% */
+.w-ghost-svg {
+  animation: ghostIn 0.3s ease-out forwards;
+}
+@keyframes ghostIn {
+  from { opacity: 0; }
+  to { opacity: 0.35; }
+}
+
+/* Ghost fades out after overlay covers it */
+.w-ghost-svg {
+  animation: ghostIn 0.3s ease-out forwards, ghostHide 0.15s ease-out 1.2s forwards;
+}
+@keyframes ghostHide {
+  from { opacity: 0.35; }
+  to { opacity: 0; }
+}
+
+/* Selection frame — expands with human drag feel */
+.w-crop-frame {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 0px;
+  height: 0px;
+  border: 1.5px solid rgba(108, 99, 255, 0.8);
+  border-radius: 4px;
+  z-index: 5;
+  pointer-events: none;
+  will-change: width, height, opacity;
+  animation:
+    wCropExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards,
+    wFrameSnap 0.4s ease-out 1.65s forwards;
+}
+
+@keyframes wCropExpand {
+  0%   { width: 0px;   height: 0px;  }
+  40%  { width: 55px;  height: 38px; }
+  55%  { width: 60px;  height: 42px; }
+  100% { width: 110px; height: 77px; }
+}
+
+@keyframes wFrameSnap {
+  0%   { border-color: rgba(108, 99, 255, 0.8); box-shadow: none; opacity: 1; }
+  10%  { border-color: rgba(108, 99, 255, 1); box-shadow: 0 0 14px rgba(108, 99, 255, 0.25); opacity: 1; }
+  100% { border-color: rgba(108, 99, 255, 0.6); box-shadow: none; opacity: 0; }
+}
+
+/* Full-color overlay — clip-path synced with frame */
+.w-white-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  height: 67px;
+  z-index: 4;
+  clip-path: inset(0 100% 100% 0);
+  will-change: clip-path;
+  animation: wRevealExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards;
+}
+
+@keyframes wRevealExpand {
+  0%   { clip-path: inset(0 100% 100% 0); }
+  40%  { clip-path: inset(0 50% 50.7% 0); }
+  55%  { clip-path: inset(0 45% 44.8% 0); }
+  100% { clip-path: inset(0 0% 0% 0); }
+}
+
+/* Blink on the overlay eyebrow — "reacting to being captured" */
+.w-blink-brow {
+  transform-origin: 260px 212px;
+  animation: wBlink 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1.7s;
+}
+@keyframes wBlink {
+  0%   { transform: translateY(0); }
+  30%  { transform: translateY(24px); }
+  35%  { transform: translateY(24px); }
+  100% { transform: translateY(0); }
+}
+
+/* Text cascade — staggered fade up */
+.w-title-anim {
+  opacity: 0;
+  animation: wFadeUp 0.35s ease-out 2.1s forwards;
+}
+.w-desc-anim {
+  opacity: 0;
+  animation: wFadeUp 0.35s ease-out 2.25s forwards;
+}
+.w-btn-anim {
+  opacity: 0;
+  animation: wFadeUp 0.35s ease-out 2.4s forwards;
+}
+@keyframes wFadeUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .welcome-logo {
   margin-bottom: 4px;
 }

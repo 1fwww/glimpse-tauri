@@ -598,15 +598,11 @@ export default function App() {
         </div>
       )}
 
-      {selection && selection.w > 0 && (
+      {selection && selection.w > 10 && selection.h > 10 && (
         <div
           className="selection-border"
           style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
         >
-          <div className="sel-handle nw" />
-          <div className="sel-handle ne" />
-          <div className="sel-handle sw" />
-          <div className="sel-handle se" />
           <div className="selection-dimensions">
             {Math.round(selection.w)} × {Math.round(selection.h)}
           </div>
