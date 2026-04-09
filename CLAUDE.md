@@ -152,6 +152,13 @@ Three-step approach, do in order, stop when "good enough":
 2. **useRef + DOM direct** — Store selection in `useRef`, update DOM elements directly (`.style.transform`), only `setState` on mouseup. Medium risk: selection bounds are read by chat panel positioning, toolbar positioning, cropped image calc, window hover detection — all need to read from ref instead of state.
 3. **Native NSView selection** — Replace WebView selection with Rust/objc2 Core Graphics overlay for the selection phase only. Mouseup passes bounds to WebView for chat+annotation. Does NOT require changing activation policy, Space logic, or ESC detection — only replaces the rendering layer. 3-5 days. All major screenshot tools (CleanShot, Shottr, Lark) use native selection. This is the only way to match their smoothness.
 
+### Overlay Prewarm Gap — Screenshot Re-trigger Delay (P0)
+User exits screenshot → waits ~1 second → triggers again → nothing happens. Root cause: 300ms after exit, old overlay is destroyed and prewarm starts. During the prewarm window (~300-800ms after exit), no overlay is available. Immediate re-trigger works (reuses hidden overlay before 300ms destruction). Fix options:
+1. **Extend reuse window** — increase 300ms delay before destruction (but delays Space re-association for fullscreen)
+2. **Pre-warm in parallel** — start creating new overlay BEFORE destroying old one, swap when ready
+3. **Keep overlay alive longer** — don't destroy at 300ms, keep hidden until new one is ready
+Critical constraint: overlay must be destroyed + re-created for fullscreen Space association (hiding preserves old Space). Need careful balance between instant re-trigger and Space correctness.
+
 ### Screenshot → Pin Transition (P1)
 ~1s delay. Root cause: creates new webview + React init on every pin. Fix: pre-warm chat window at startup (hidden, offscreen) so pin only needs reposition + show. Prior attempt caused screenshot shortcut bug — needs careful window lifecycle management. Do NOT change `close_chat_window` to hide (tried, caused issues). Instead: create chat window offscreen during startup prewarm phase, after overlay prewarm.
 
