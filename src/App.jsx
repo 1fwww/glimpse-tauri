@@ -341,7 +341,37 @@ export default function App() {
     setSelectedAnnotation(null)
   }
 
+  const rafRef = useRef(null)
+  const selectionRef = useRef(null) // current selection during drag (avoids setState)
+  const maskRectRef = useRef(null)
+  const borderRef = useRef(null)
+  const dimsRef = useRef(null)
+
+  const updateSelectionDOM = (sel) => {
+    // Update DOM directly without React re-render
+    if (maskRectRef.current) {
+      maskRectRef.current.setAttribute('x', sel.x)
+      maskRectRef.current.setAttribute('y', sel.y)
+      maskRectRef.current.setAttribute('width', sel.w)
+      maskRectRef.current.setAttribute('height', sel.h)
+    }
+    if (borderRef.current) {
+      borderRef.current.style.left = sel.x + 'px'
+      borderRef.current.style.top = sel.y + 'px'
+      borderRef.current.style.width = sel.w + 'px'
+      borderRef.current.style.height = sel.h + 'px'
+      borderRef.current.style.display = sel.w > 10 && sel.h > 10 ? 'block' : 'none'
+    }
+    if (dimsRef.current) {
+      dimsRef.current.textContent = `${Math.round(sel.w)} × ${Math.round(sel.h)}`
+    }
+  }
+
   const handleMouseMove = (e) => {
+    // rAF throttle — max one update per frame
+    if (rafRef.current) return
+    rafRef.current = requestAnimationFrame(() => { rafRef.current = null })
+
     // Resizing existing selection
     if (isResizingSelection && moveStart.current) {
       const dx = e.clientX - moveStart.current.x
@@ -401,10 +431,15 @@ export default function App() {
       const dy = Math.abs(e.clientY - startPos.y)
 
       if (dx > 5 || dy > 5) {
-        setHoveredWindow(null)
+        if (hoveredWindow) setHoveredWindow(null)
         const x = Math.min(startPos.x, e.clientX)
         const y = Math.min(startPos.y, e.clientY)
-        setSelection({ x, y, w: dx, h: dy })
+        const sel = { x, y, w: dx, h: dy }
+        selectionRef.current = sel
+        // Direct DOM update — no React re-render during drag
+        updateSelectionDOM(sel)
+        // Only setState once to make mask visible (first time)
+        if (!selection) setSelection(sel)
       }
       return
     }
@@ -442,12 +477,19 @@ export default function App() {
     setIsSelecting(false)
     setStartPos(null)
 
+    // Commit ref to state (final position after drag)
+    const finalSel = selectionRef.current || selection
+    if (selectionRef.current) {
+      setSelection(selectionRef.current)
+      selectionRef.current = null
+    }
+
     // Dragged a selection
-    if (selection && selection.w > 10 && selection.h > 10) {
+    if (finalSel && finalSel.w > 10 && finalSel.h > 10) {
       setHoveredWindow(null)
       setChatVisible(true)
       setChatMinimized(chatWasOpenRef.current ? false : (userMinimizedRef.current || tm.isNewThread))
-      cropSelection(selection, screenImage)
+      cropSelection(finalSel, screenImage)
       return
     }
 
@@ -551,7 +593,7 @@ export default function App() {
             <defs>
               <mask id="selectionMask">
                 <rect width="100%" height="100%" fill="white" />
-                <rect x={selection.x} y={selection.y} width={selection.w} height={selection.h} fill="black" />
+                <rect ref={maskRectRef} x={selection.x} y={selection.y} width={selection.w} height={selection.h} fill="black" />
               </mask>
             </defs>
             <rect width="100%" height="100%" fill="rgba(4, 8, 16, 0.55)" mask="url(#selectionMask)" />
@@ -598,12 +640,13 @@ export default function App() {
         </div>
       )}
 
-      {selection && selection.w > 10 && selection.h > 10 && (
+      {selection && (
         <div
+          ref={borderRef}
           className="selection-border"
-          style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
+          style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h, display: selection.w > 10 && selection.h > 10 ? 'block' : 'none' }}
         >
-          <div className="selection-dimensions">
+          <div className="selection-dimensions" ref={dimsRef}>
             {Math.round(selection.w)} × {Math.round(selection.h)}
           </div>
         </div>

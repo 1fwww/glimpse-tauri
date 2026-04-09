@@ -142,8 +142,60 @@ pub fn create_settings_window(app: &AppHandle, panel_bounds: Option<&serde_json:
     Ok(())
 }
 
+/// Pre-warm chat window (hidden, offscreen) so Cmd+Shift+X and Pin are instant
+pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    if app.get_webview_window("chat").is_some() {
+        return Ok(());
+    }
+    eprintln!("[Chat] Pre-warming chat webview...");
+    let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
+        .title("Glimpse Chat")
+        .inner_size(432.0, 412.0)
+        .position(-9999.0, -9999.0) // offscreen but visible (WebKit needs visible to run JS)
+        .resizable(true)
+        .decorations(false)
+        .transparent(true)
+        .accept_first_mouse(true)
+        .build()?;
+    let w = win.clone();
+    let _ = win.run_on_main_thread(move || {
+        crate::native_mac::set_transparent_background(&w);
+        crate::native_mac::set_window_shadow(&w, false);
+    });
+    // Wait for React to init (may take a few seconds for WebView to load)
+    CHAT_READY.store(false, std::sync::atomic::Ordering::SeqCst);
+    for _ in 0..300 {
+        if CHAT_READY.load(std::sync::atomic::Ordering::SeqCst) { break; }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    // Hide after React init (was visible offscreen for WebKit to run JS)
+    if let Some(w) = app.get_webview_window("chat") {
+        let _ = w.hide();
+    }
+    eprintln!("[Chat] Pre-warm complete, CHAT_READY={}", CHAT_READY.load(std::sync::atomic::Ordering::SeqCst));
+    Ok(())
+}
+
 pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(w) = app.get_webview_window("chat") {
+        // Chat exists (pre-warmed or hidden) — reposition if offscreen, then show + focus
+        if let Ok(pos) = w.outer_position() {
+            let scale = w.current_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(2.0);
+            let x = pos.x as f64 / scale;
+            if x < -1000.0 {
+                // Offscreen (pre-warmed) — move to screen center
+                if let Some(m) = app.primary_monitor().ok().flatten() {
+                    let s = m.scale_factor();
+                    let sw = m.size().width as f64 / s;
+                    let sh = m.size().height as f64 / s;
+                    let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: (sw - 432.0) / 2.0,
+                        y: (sh - 412.0) / 2.0,
+                    }));
+                }
+            }
+        }
+        let _ = w.show();
         w.set_focus()?;
         return Ok(());
     }
@@ -269,14 +321,15 @@ pub fn close_overlay(app: AppHandle) {
         // screen-captured event will overwrite state when shown again.
         let _ = w.set_always_on_top(false);
         let _ = w.hide();
-        // After a delay, destroy and prewarm fresh (needed for fullscreen Space association)
+        // Destroy old overlay after reuse window, prewarm starts immediately after destroy
         let app2 = app.clone();
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(300));
+            // Reuse window: hidden overlay can be reused for 2s
+            std::thread::sleep(std::time::Duration::from_millis(2000));
             if let Some(ow) = app2.get_webview_window("overlay") {
                 if !ow.is_visible().unwrap_or(true) {
                     let _ = ow.close();
-                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    // Prewarm immediately after destroy — no extra delay
                     let _ = prewarm_overlay(&app2);
                 }
             }
@@ -359,7 +412,9 @@ pub fn close_settings(app: AppHandle) {
 #[tauri::command]
 pub fn close_chat_window(app: AppHandle) {
     if let Some(w) = app.get_webview_window("chat") {
-        let _ = w.close();
+        // Hide instead of close — keeps webview warm for instant re-open
+        let _ = w.set_always_on_top(false);
+        let _ = w.hide();
     }
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.close();
@@ -499,60 +554,84 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
         (200.0, 200.0, 420.0, 550.0)
     };
 
-    // Create chat window at exact position BEFORE closing overlay
-    if app.get_webview_window("chat").is_none() {
-        let _ = WebviewWindowBuilder::new(&app, "chat", WebviewUrl::App("index.html#chat-only".into()))
-            .title("Glimpse Chat")
-            .position(cx, cy)
-            .inner_size(cw, ch)
-            .resizable(true)
-            .decorations(false)
-            .transparent(true)
-            .accept_first_mouse(true)
-            .always_on_top(true)
-            .visible(false)
-            .build();
-        if let Some(win) = app.get_webview_window("chat") {
-            let w = win.clone();
-            let _ = win.run_on_main_thread(move || {
-                crate::native_mac::set_transparent_background(&w);
-                crate::native_mac::set_window_shadow(&w, false);
-            });
-        }
-    }
+    let chat_ready = CHAT_READY.load(Ordering::SeqCst);
+    let chat_exists = app.get_webview_window("chat").is_some();
 
-    // Close overlay
-    if let Some(w) = app.get_webview_window("overlay") {
-        let _ = w.close();
-    }
-
-    // Wait for chat frontend to be ready, then show
-    let app_pin = app.clone();
-    std::thread::spawn(move || {
-        // Poll for chat_ready (set by chat_ready command) instead of blind sleep
-        CHAT_READY.store(false, Ordering::SeqCst);
-        for _ in 0..80 {
-            if CHAT_READY.load(Ordering::SeqCst) { break; }
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        if let Some(w) = app_pin.get_webview_window("chat") {
-            if let Some(data) = thread_data {
-                let _ = w.emit("load-thread-data", &data);
+    eprintln!("[Pin] chat_exists={}, chat_ready={}", chat_exists, chat_ready);
+    if chat_exists && chat_ready {
+        eprintln!("[Pin] FAST PATH — reposition + show");
+        // Fast path — chat is pre-warmed, reposition + show immediately
+        if let Some(w) = app.get_webview_window("chat") {
+            let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: cx, y: cy }));
+            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: cw, height: ch }));
+            let _ = w.set_always_on_top(true);
+            if let Some(data) = &thread_data {
+                let _ = w.emit("load-thread-data", data);
             }
             let _ = w.emit("pin-state", true);
-            // Brief delay for data to be processed before showing
-            std::thread::sleep(std::time::Duration::from_millis(50));
             let _ = w.show();
             let _ = w.set_focus();
         }
-
-        // Pre-warm in background — don't block pin flow
-        let app_pw = app_pin.clone();
+        // Close overlay with brief overlap for smooth transition
+        let app_close = app.clone();
         std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            if let Some(w) = app_close.get_webview_window("overlay") {
+                let _ = w.close();
+            }
             std::thread::sleep(std::time::Duration::from_millis(500));
-            let _ = prewarm_overlay(&app_pw);
+            let _ = prewarm_overlay(&app_close);
         });
-    });
+    } else {
+        // Slow path — create fresh chat window
+        if !chat_exists {
+            let _ = WebviewWindowBuilder::new(&app, "chat", WebviewUrl::App("index.html#chat-only".into()))
+                .title("Glimpse Chat")
+                .position(cx, cy)
+                .inner_size(cw, ch)
+                .resizable(true)
+                .decorations(false)
+                .transparent(true)
+                .accept_first_mouse(true)
+                .always_on_top(true)
+                .visible(false)
+                .build();
+            if let Some(win) = app.get_webview_window("chat") {
+                let w = win.clone();
+                let _ = win.run_on_main_thread(move || {
+                    crate::native_mac::set_transparent_background(&w);
+                    crate::native_mac::set_window_shadow(&w, false);
+                });
+            }
+        }
+        // Close overlay
+        if let Some(w) = app.get_webview_window("overlay") {
+            let _ = w.close();
+        }
+        // Wait for chat ready
+        let app_pin = app.clone();
+        std::thread::spawn(move || {
+            CHAT_READY.store(false, Ordering::SeqCst);
+            for _ in 0..80 {
+                if CHAT_READY.load(Ordering::SeqCst) { break; }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            if let Some(w) = app_pin.get_webview_window("chat") {
+                if let Some(data) = thread_data {
+                    let _ = w.emit("load-thread-data", &data);
+                }
+                let _ = w.emit("pin-state", true);
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+            let app_pw = app_pin.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                let _ = prewarm_overlay(&app_pw);
+            });
+        });
+    }
 }
 
 #[tauri::command]

@@ -137,9 +137,13 @@ pub fn run() {
 
             // Pre-warm overlay window for instant screenshot
             let app_prewarm = app.handle().clone();
+            let app_chat_prewarm = app.handle().clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 let _ = windows::prewarm_overlay(&app_prewarm);
+                // Pre-warm chat webview after overlay (separate delay, no competition)
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                let _ = windows::prewarm_chat(&app_chat_prewarm);
             });
 
             // Pre-warm System Events in separate thread (can be slow, don't block overlay)
@@ -377,11 +381,14 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                     }
                 }
 
-                // Clean up hidden windows
-                for label in &["home", "chat", "settings"] {
+                // Hide other windows (don't close chat — keep pre-warmed)
+                for label in &["home", "settings"] {
                     if let Some(w) = app_clone.get_webview_window(label) {
                         let _ = w.close();
                     }
+                }
+                if let Some(w) = app_clone.get_webview_window("chat") {
+                    let _ = w.hide();
                 }
 
                 // Schedule next pre-warm
@@ -429,33 +436,17 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         }
     }
 
-    // Grab selected text BEFORE focusing our window
+    // Grab text FIRST (need focus on source app), then show chat
     let app_clone = app.clone();
     std::thread::spawn(move || {
-        // Wait for shortcut keys to release
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(50));
         let selected_text = grab_selected_text();
 
-        if let Some(w) = app_clone.get_webview_window("chat") {
-            // Chat already exists — send text and focus
-            if !selected_text.is_empty() {
-                let _ = w.emit("text-context", &selected_text);
-            }
-            let _ = w.set_focus();
-        } else {
-            // Create new chat window, wait for ready via event
-            let _ = windows::create_chat_window(&app_clone);
-            use std::sync::atomic::Ordering;
-            windows::CHAT_READY.store(false, Ordering::SeqCst);
-            for _ in 0..80 {
-                if windows::CHAT_READY.load(Ordering::SeqCst) { break; }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
+        // Now show chat (instant if pre-warmed)
+        let _ = windows::create_chat_window(&app_clone);
+        if !selected_text.is_empty() {
             if let Some(w) = app_clone.get_webview_window("chat") {
-                if !selected_text.is_empty() {
-                    let _ = w.emit("text-context", &selected_text);
-                }
-                let _ = w.set_focus();
+                let _ = w.emit("text-context", &selected_text);
             }
         }
     });
@@ -489,10 +480,10 @@ fn grab_selected_text() -> String {
         .args(["-e", r#"tell application "System Events" to keystroke "c" using command down"#])
         .output();
 
-    // Poll clipboard for the new content (more attempts, longer wait)
+    // Poll clipboard — fast initial checks, bail early
     let mut selected = String::new();
-    for _ in 0..20 {
-        std::thread::sleep(std::time::Duration::from_millis(40));
+    for _ in 0..10 {
+        std::thread::sleep(std::time::Duration::from_millis(25));
         if let Ok(output) = Command::new("pbpaste").output() {
             let text = String::from_utf8_lossy(&output.stdout).to_string();
             if !text.is_empty() {

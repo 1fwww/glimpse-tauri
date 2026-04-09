@@ -26,7 +26,6 @@ export default function ChatOnlyApp() {
 
   const handleClose = () => {
     window.electronAPI?.closeChatWindow?.()
-    window.close()
   }
 
   // ESC to close — capture phase
@@ -44,8 +43,8 @@ export default function ChatOnlyApp() {
 
   // Signal main process that React has rendered
   useEffect(() => {
-    if (tm.currentThread) window.electronAPI?.chatReady?.()
-  }, [!!tm.currentThread])
+    window.electronAPI?.chatReady?.()
+  }, [])
 
   if (!tm.currentThread) return null
 
