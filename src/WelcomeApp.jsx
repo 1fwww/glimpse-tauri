@@ -3,8 +3,12 @@ import './app.css'
 
 export default function WelcomeApp() {
   const [step, setStep] = useState(() => {
+    // Check if onboarding was previously completed (stale localStorage after reinstall)
+    // welcome window only opens when onboarding-done file doesn't exist,
+    // so if step was saved as 3+ (completed), it's stale — reset to 0
     const saved = localStorage.getItem('welcome-step')
-    return saved ? parseInt(saved, 10) : 0
+    const val = saved ? parseInt(saved, 10) : 0
+    return val >= 3 ? 0 : val
   })
   const [permissions, setPermissions] = useState({ screen: false, accessibility: false })
   const [checking, setChecking] = useState(false)
@@ -30,7 +34,7 @@ export default function WelcomeApp() {
     }
   }, [step])
 
-  // Persist step across restarts
+  // Persist step for resume after restart (capped on read, not write)
   useEffect(() => {
     localStorage.setItem('welcome-step', step.toString())
   }, [step])

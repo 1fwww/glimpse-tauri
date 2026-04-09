@@ -115,6 +115,12 @@ pub fn run() {
                 .menu(&tray_menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |_app, event| {
+                    // If onboarding not done, redirect to welcome
+                    let data_dir = get_data_dir();
+                    if !data_dir.join("onboarding-done").exists() && event.id.as_ref() != "quit" {
+                        let _ = windows::create_welcome_window(&app_tray);
+                        return;
+                    }
                     match event.id.as_ref() {
                         "screenshot" => handle_screenshot_shortcut(&app_tray),
                         "chat" => handle_chat_shortcut(&app_tray),
@@ -136,13 +142,18 @@ pub fn run() {
                     api.prevent_exit();
                 }
                 tauri::RunEvent::Reopen { .. } => {
-                    // Dock icon clicked — open chat if no windows visible
+                    // Dock icon clicked
                     let has_visible = app.webview_windows().values().any(|w| {
                         let label = w.label();
                         label != "overlay" && w.is_visible().unwrap_or(false)
                     });
                     if !has_visible {
-                        let _ = windows::create_chat_window(app);
+                        let data_dir = get_data_dir();
+                        if data_dir.join("onboarding-done").exists() {
+                            let _ = windows::create_chat_window(app);
+                        } else {
+                            let _ = windows::create_welcome_window(app);
+                        }
                     }
                 }
                 _ => {}
