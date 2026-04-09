@@ -55,6 +55,7 @@ pub fn create_welcome_window(app: &AppHandle) -> Result<(), Box<dyn std::error::
     let w = win.clone();
     let _ = win.run_on_main_thread(move || {
         crate::native_mac::set_transparent_background(&w);
+        crate::native_mac::set_window_shadow(&w, false);
     });
     Ok(())
 }
@@ -129,6 +130,7 @@ pub fn create_settings_window(app: &AppHandle, panel_bounds: Option<&serde_json:
     let w = win.clone();
     let _ = win.run_on_main_thread(move || {
         crate::native_mac::set_transparent_background(&w);
+        crate::native_mac::set_window_shadow(&w, false);
         crate::native_mac::set_visible_on_fullscreen(&w, true);
         if is_overlay_mode {
             crate::native_mac::set_window_level_screen_saver(&w);
@@ -157,6 +159,7 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
     let w = win.clone();
     let _ = win.run_on_main_thread(move || {
         crate::native_mac::set_transparent_background(&w);
+        crate::native_mac::set_window_shadow(&w, false);
     });
     Ok(())
 }
@@ -513,6 +516,7 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
             let w = win.clone();
             let _ = win.run_on_main_thread(move || {
                 crate::native_mac::set_transparent_background(&w);
+                crate::native_mac::set_window_shadow(&w, false);
             });
         }
     }
