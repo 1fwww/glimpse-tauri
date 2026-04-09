@@ -107,8 +107,11 @@ pub fn run() {
             let tray_menu = Menu::with_items(app, &[&screenshot_i, &chat_i, &settings_i, &quit_i])?;
 
             let app_tray = app.handle().clone();
+            let tray_icon_bytes = include_bytes!("../icons/tray-icon.png");
+            let tray_icon = tauri::image::Image::from_bytes(tray_icon_bytes).expect("failed to load tray icon");
             let _ = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
+                .icon_as_template(true)
                 .menu(&tray_menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |_app, event| {
