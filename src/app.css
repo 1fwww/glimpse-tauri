@@ -330,6 +330,8 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: var(--radius-lg);
+  border: 1px solid var(--border-dim);
+  box-shadow: var(--shadow-md);
   -webkit-app-region: no-drag;
 }
 
@@ -2248,7 +2250,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-dim);
+  box-shadow: var(--shadow-md);
   -webkit-app-region: drag;
 }
 
