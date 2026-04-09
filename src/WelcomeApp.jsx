@@ -238,8 +238,7 @@ export default function WelcomeApp() {
               <div className={`pin-demo-panel ${pinnedEgg ? 'pin-demo-pinned' : ''}`}>
                 <div className="pin-demo-header">
                   <svg viewBox="60 140 420 280" width={16} height={11} style={{ flexShrink: 0 }}>
-                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: pinnedEgg ? 0 : 1, transition: 'opacity 0.3s ease' }} />
-                    <path d="M98 192C200 192 350 204 420 234" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: pinnedEgg ? 1 : 0, transition: 'opacity 0.3s ease' }} />
+                    <path d={pinnedEgg ? "M98 192C200 192 350 204 420 234" : "M98 212C152 174 365 158 420 248"} fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
                     <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
                   </svg>
                   <span className="pin-demo-title">New Chat</span>
