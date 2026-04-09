@@ -95,6 +95,7 @@ if (window.__TAURI_INTERNALS__ && !window.electronAPI) {
     onPinState: (callback) => listen('pin-state', callback),
     onLoadThreadData: (callback) => listen('load-thread-data', callback),
     onSetCroppedImage: (callback) => listen('set-cropped-image', callback),
+    onClearScreenshot: (callback) => listen('clear-screenshot', callback),
     onTextContext: (callback) => listen('text-context', callback),
     onShortcutTried: (callback) => listen('shortcut-tried', callback),
     onResetOverlay: (callback) => listen('reset-overlay', callback),

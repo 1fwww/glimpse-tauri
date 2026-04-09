@@ -13,6 +13,7 @@ export default function ChatOnlyApp() {
     window.electronAPI?.onTextContext?.((text) => setInitialContext(prev => ({ text: text?.trim() || '', seq: prev.seq + 1 })))
     window.electronAPI?.onPinState?.((state) => setIsPinned(state))
     window.electronAPI?.onSetCroppedImage?.((img) => setCroppedImage(img))
+    window.electronAPI?.onClearScreenshot?.(() => setCroppedImage(null))
     // Receive full thread data from pin (no disk read needed)
     window.electronAPI?.onLoadThreadData?.((data) => {
       if (data) {

@@ -256,11 +256,15 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
     let is_vis = |label: &str| -> bool {
         app.get_webview_window(label).map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
     };
-    let has_visible = is_vis("home") || is_vis("chat") || is_vis("settings") || is_vis("overlay");
-    eprintln!("[Screenshot] triggered, has_visible={}", has_visible);
+    let vis_home = is_vis("home"); let vis_chat = is_vis("chat"); let vis_settings = is_vis("settings"); let vis_overlay = is_vis("overlay");
+    let has_visible = vis_home || vis_chat || vis_settings || vis_overlay;
+    eprintln!("[Screenshot] triggered, has_visible={} (home={}, chat={}, settings={}, overlay={}), IS_ACCESSORY={}",
+        has_visible, vis_home, vis_chat, vis_settings, vis_overlay,
+        IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst));
 
     // Switch to Accessory policy — must complete before capture for fullscreen Spaces
     if !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        eprintln!("[Screenshot] switching to Accessory policy...");
         if let Some(ow) = app.get_webview_window("overlay") {
             let app2 = app.clone();
             let ow2 = ow.clone();
@@ -368,7 +372,6 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                     eprintln!("[Screenshot] no pre-warm, creating fresh overlay");
                     let _ = windows::create_overlay_window(&app_clone, &display_info);
                     // Wait for webview to load (fresh overlay, no prewarm)
-                    // Wait for webview to load, polling for readiness
                     for _ in 0..40 {
                         if app_clone.get_webview_window("overlay").is_some() { break; }
                         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -376,7 +379,26 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
                     // Small extra delay for webview JS to initialize
                     std::thread::sleep(std::time::Duration::from_millis(200));
                     if let Some(w) = app_clone.get_webview_window("overlay") {
+                        // Same show sequence as pre-warmed path
+                        let _ = w.set_always_on_top(true);
+                        let _ = w.set_visible_on_all_workspaces(true);
+                        let w2 = w.clone();
+                        let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                        let done2 = done.clone();
+                        let _ = w.run_on_main_thread(move || {
+                            native_mac::activate_app();
+                            native_mac::set_visible_on_fullscreen(&w2, true);
+                            native_mac::set_window_level_screen_saver(&w2);
+                            native_mac::order_front(&w2);
+                            done2.store(true, std::sync::atomic::Ordering::Release);
+                        });
+                        for _ in 0..30 {
+                            if done.load(std::sync::atomic::Ordering::Acquire) { break; }
+                            std::thread::sleep(std::time::Duration::from_millis(2));
+                        }
                         let _ = w.emit("screen-captured", &payload);
+                        let _ = w.show();
+                        let _ = w.set_focus();
                         native_mac::install_esc_monitor(app_clone.clone());
                     }
                 }
@@ -410,9 +432,17 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         return;
     }
 
-    // Close home window if open
+    // Close/hide all other windows first (shortcut = clear everything + execute)
     if let Some(w) = app.get_webview_window("home") {
         let _ = w.close();
+    }
+    // If overlay is active, hide it (lightweight — no policy change, no hide_app)
+    if let Some(w) = app.get_webview_window("overlay") {
+        if w.is_visible().unwrap_or(false) {
+            native_mac::remove_esc_monitor();
+            let _ = w.set_always_on_top(false);
+            let _ = w.hide();
+        }
     }
 
     // If no visible windows, switch to Accessory policy for fullscreen Space support
@@ -444,8 +474,10 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
 
         // Now show chat (instant if pre-warmed)
         let _ = windows::create_chat_window(&app_clone);
-        if !selected_text.is_empty() {
-            if let Some(w) = app_clone.get_webview_window("chat") {
+        if let Some(w) = app_clone.get_webview_window("chat") {
+            // Clear stale screenshot from previous session
+            let _ = w.emit("clear-screenshot", ());
+            if !selected_text.is_empty() {
                 let _ = w.emit("text-context", &selected_text);
             }
         }
