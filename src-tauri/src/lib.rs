@@ -5,6 +5,8 @@ mod windows;
 
 use std::fs;
 use tauri::{Emitter, Manager};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
 pub fn run() {
@@ -97,6 +99,29 @@ pub fn run() {
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 let _ = windows::prewarm_overlay(&app_prewarm);
             });
+
+            // Tray icon — additive, does not replace Home window
+            let screenshot_i = MenuItem::with_id(app, "screenshot", "Screenshot    ⌘⇧Z", true, None::<&str>)?;
+            let chat_i = MenuItem::with_id(app, "chat", "Text Chat    ⌘⇧X", true, None::<&str>)?;
+            let settings_i = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit Glimpse", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&screenshot_i, &chat_i, &settings_i, &quit_i])?;
+
+            let app_tray = app.handle().clone();
+            let _ = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&tray_menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(move |_app, event| {
+                    match event.id.as_ref() {
+                        "screenshot" => handle_screenshot_shortcut(&app_tray),
+                        "chat" => handle_chat_shortcut(&app_tray),
+                        "settings" => { let _ = windows::create_settings_window(&app_tray, None); },
+                        "quit" => std::process::exit(0),
+                        _ => {}
+                    }
+                })
+                .build(app);
 
             Ok(())
         })
