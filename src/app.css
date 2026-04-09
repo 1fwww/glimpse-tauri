@@ -2031,14 +2031,14 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: var(--surface-deep);
+  background: var(--surface-elevated);
   flex: 1;
   overflow-y: auto;
-  animation: setupSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: setupSlideUp 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes setupSlideUp {
-  from { opacity: 0; transform: translateY(40px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -3832,7 +3832,7 @@
 }
 
 .theme-light .api-key-setup {
-  background: var(--surface-deep);
+  background: var(--surface-elevated);
 }
 
 /* api-key-field input uses var(--surface-input) — auto-switches per theme */
