@@ -325,7 +325,7 @@ export default function WelcomeApp() {
               </div>
             </div>
 
-            <button className="welcome-btn" onClick={handleGetStarted}>Start Using Glimpse</button>
+            <button className="welcome-btn" onClick={handleGetStarted}>Start Glimpsing</button>
           </div>
         )}
 

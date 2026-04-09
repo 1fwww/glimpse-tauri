@@ -25,7 +25,7 @@ fn build_tray_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::err
         menu_items.push(Box::new(MenuItem::with_id(app, "recent_header", "Recent Chats", false, None::<&str>)?));
         for (i, t) in threads.iter().take(5).enumerate() {
             let title = t.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled");
-            let truncated = if title.len() > 30 { format!("{}...", &title[..27]) } else { title.to_string() };
+            let truncated = if title.len() > 28 { format!("💬 {}...", &title[..25]) } else { format!("💬 {}", title) };
             menu_items.push(Box::new(MenuItem::with_id(app, &format!("thread_{}", i), &truncated, true, None::<&str>)?));
         }
     } else {
@@ -171,12 +171,22 @@ pub fn run() {
                             if let Ok(idx) = id.replace("thread_", "").parse::<usize>() {
                                 let threads = commands::threads::get_threads().unwrap_or_default();
                                 if let Some(thread) = threads.get(idx) {
-                                    if let Some(thread_id) = thread.get("id").and_then(|v| v.as_str()) {
-                                        let _ = windows::create_chat_window(&app_tray);
-                                        if let Some(w) = app_tray.get_webview_window("chat") {
-                                            let _ = w.emit("load-thread-data", thread);
+                                    let thread_data = thread.clone();
+                                    let app_thread = app_tray.clone();
+                                    let _ = windows::create_chat_window(&app_tray);
+                                    // Delay emit to ensure chat window is ready
+                                    std::thread::spawn(move || {
+                                        // Wait for CHAT_READY
+                                        for _ in 0..50 {
+                                            if windows::CHAT_READY.load(std::sync::atomic::Ordering::SeqCst) { break; }
+                                            std::thread::sleep(std::time::Duration::from_millis(10));
                                         }
-                                    }
+                                        std::thread::sleep(std::time::Duration::from_millis(50));
+                                        if let Some(w) = app_thread.get_webview_window("chat") {
+                                            let _ = w.emit("load-thread-data", &thread_data);
+                                            let _ = w.set_focus();
+                                        }
+                                    });
                                 }
                             }
                         },
