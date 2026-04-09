@@ -40,16 +40,48 @@ The welcome splash uses a "screenshot capture" metaphor to introduce the Glimpse
 
 ```
 0.0–0.3s   Ghost eye fades in at 35% opacity
-0.5–1.3s   Frame expands + progressive color reveal (synced)
-1.2–1.35s  Ghost fades out (masked by overlay, 0.15s ease-out)
-1.65s      Frame snap: flash→fade (0.4s single animation)
-1.7s       Eyebrow blink (synced with frame fade — "被拍到眨眼")
-2.1s       "Glimpse" title fades up
-2.25s      Tagline fades up
-2.4s       "Get Started" button fades up
+0.35–0.7s  Cursor dot appears (8px purple circle), pauses 0.35s
+0.7–1.5s   Dot fades, frame expands from 8×8 + progressive color reveal (synced)
+1.4–1.55s  Ghost fades out (masked by overlay, 0.15s ease-out)
+1.85s      Frame snap: flash→fade (0.4s single animation)
+1.9s       Eyebrow blink (synced with frame fade — "被拍到眨眼")
+2.3s       "Glimpse" title fades up
+2.45s      Tagline fades up
+2.6s       "Get Started" button fades up
 ```
 
 ## Animation Details
+
+### 0. Cursor Dot (0.35–0.7s)
+
+A small purple dot appears at the frame's starting position (top-left of eye), pauses for 0.35s like a cursor being placed, then fades as the frame starts expanding. This is the "someone placed their cursor here" moment before dragging.
+
+```jsx
+<div className="w-cursor-dot" />
+```
+
+```css
+.w-cursor-dot {
+  position: absolute;
+  top: -5px; left: -5px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(108, 99, 255, 0.7);
+  z-index: 6;
+  opacity: 0;
+}
+
+animation: wDotIn 0.15s ease-out 0.35s forwards, wDotOut 0.1s ease-out 0.7s forwards;
+
+@keyframes wDotIn {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes wDotOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+```
 
 ### 1. Ghost Eye (0–0.3s)
 
@@ -66,24 +98,26 @@ The welcome splash uses a "screenshot capture" metaphor to introduce the Glimpse
 
 The container itself is set to `opacity: 1` immediately (via a 0.01s animation). Only the SVG inside fades to 35%.
 
-### 2. Frame Expansion — Human Drag Feel (0.5–1.3s)
+### 2. Frame Expansion — Human Drag Feel (0.7–1.5s)
+
+Starts at 8×8 (matches the cursor dot size) instead of 0×0. Delay shifted to 0.7s so it begins as the dot fades.
 
 ```css
 .w-crop-frame {
   position: absolute;
-  top: -5px; left: -5px;        /* 5px margin around 100×67 eye */
-  width: 0px; height: 0px;      /* starts collapsed */
+  top: -5px; left: -5px;
+  width: 0px; height: 0px;
   border: 1.5px solid rgba(108, 99, 255, 0.8);
   border-radius: 4px;
 }
 
-animation: wCropExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards;
+animation: wCropExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.7s forwards;
 
 @keyframes wCropExpand {
-  0%   { width: 0px;   height: 0px;  }
-  40%  { width: 55px;  height: 38px; }  /* fast initial drag */
-  55%  { width: 60px;  height: 42px; }  /* human hesitation — only 5px in 15% of time */
-  100% { width: 110px; height: 77px; }  /* commits to full size */
+  0%   { width: 8px;   height: 8px;  }   /* matches cursor dot size */
+  40%  { width: 55px;  height: 38px; }   /* fast initial drag */
+  55%  { width: 60px;  height: 42px; }   /* human hesitation */
+  100% { width: 110px; height: 77px; }   /* commits to full size */
 }
 ```
 

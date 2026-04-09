@@ -240,6 +240,19 @@ body {
   will-change: opacity;
 }
 
+/* Cursor dot — lands before frame expands */
+.w-cursor-dot {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(108, 99, 255, 0.7);
+  z-index: 6;
+  opacity: 0;
+}
+
 /* Frame covers ENTIRE eye with 5px margin */
 .w-crop-frame {
   position: absolute;
@@ -257,11 +270,12 @@ body {
 /* ═══ Welcome Animation ═══
 
   0.0-0.3s   Ghost eye fades in (35% opacity)
-  0.5-1.3s   Frame expands + progressive color reveal (human drag with mid-pause)
-  1.2-1.35s  Ghost fades out (masked by full-color overlay)
-  1.65s      Frame snap (flash → fade, 0.4s)
-  1.7s       Blink (synced with frame fade)
-  2.1-2.4s   Text appears: title → tagline → button
+  0.35-0.5s  Cursor dot appears (8px, 0.35s pause)
+  0.7-1.5s   Dot fades, frame expands + progressive color reveal (human drag with mid-pause)
+  1.4-1.55s  Ghost fades out (masked by full-color overlay)
+  1.85s      Frame snap (flash → fade, 0.4s)
+  1.9s       Blink (synced with frame fade)
+  2.3-2.6s   Text appears: title → tagline → button
 
 ═══ */
 
@@ -272,9 +286,22 @@ body {
   to { opacity: 1; }
 }
 
+/* Cursor dot — appears, pauses, then fades as frame starts */
+.playing-w .w-cursor-dot {
+  animation: wDotIn 0.15s ease-out 0.35s forwards, wDotOut 0.1s ease-out 0.7s forwards;
+}
+@keyframes wDotIn {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes wDotOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 /* Ghost SVG — faint purple, hides when progressive reveal completes */
 .playing-w .w-eye-container > svg {
-  animation: ghostIn 0.3s ease-out forwards, ghostHide 0.15s ease-out 1.2s forwards;
+  animation: ghostIn 0.3s ease-out forwards, ghostHide 0.15s ease-out 1.4s forwards;
 }
 @keyframes ghostHide {
   from { opacity: 0.35; }
@@ -288,13 +315,13 @@ body {
 /* Frame expands from top-left — human drag feel with mid-pause */
 .playing-w .w-crop-frame {
   animation:
-    wCropExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards,
-    wFrameSnap 0.4s ease-out 1.65s forwards;
+    wCropExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.7s forwards,
+    wFrameSnap 0.4s ease-out 1.85s forwards;
 }
 @keyframes wCropExpand {
   0% {
     top: -5px; left: -5px;
-    width: 0px; height: 0px; opacity: 1;
+    width: 8px; height: 8px; opacity: 1;
   }
   40% {
     top: -5px; left: -5px;
@@ -324,10 +351,10 @@ body {
   will-change: clip-path;
 }
 .playing-w .w-white-overlay {
-  animation: wRevealExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.5s forwards;
+  animation: wRevealExpand 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.7s forwards;
 }
 @keyframes wRevealExpand {
-  0%   { opacity: 1; clip-path: inset(0 100% 100% 0); }
+  0%   { opacity: 1; clip-path: inset(0 97% 95.5% 0); }
   40%  { opacity: 1; clip-path: inset(0 50% 50.7% 0); }
   55%  { opacity: 1; clip-path: inset(0 45% 44.8% 0); }
   100% { opacity: 1; clip-path: inset(0 0% 0% 0); }
@@ -336,7 +363,7 @@ body {
 /* Blink synced with frame fade */
 .playing-w .w-white-overlay svg path:first-child {
   transform-origin: 260px 212px;
-  animation: wBlink 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1.7s;
+  animation: wBlink 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1.9s;
 }
 @keyframes wBlink {
   0% { transform: translateY(0); }
@@ -350,9 +377,9 @@ body {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.playing-w .w-title { animation: wFadeUp 0.35s ease-out 2.1s forwards; }
-.playing-w .w-desc { animation: wFadeUp 0.35s ease-out 2.25s forwards; }
-.playing-w .w-btn { animation: wFadeUp 0.35s ease-out 2.4s forwards; }
+.playing-w .w-title { animation: wFadeUp 0.35s ease-out 2.3s forwards; }
+.playing-w .w-desc { animation: wFadeUp 0.35s ease-out 2.45s forwards; }
+.playing-w .w-btn { animation: wFadeUp 0.35s ease-out 2.6s forwards; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; }
@@ -407,6 +434,7 @@ body {
         <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="var(--brand)" stroke-width="20" stroke-linecap="round"/>
         <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="var(--brand)" stroke-width="22" stroke-linecap="round"/>
       </svg>
+      <div class="w-cursor-dot"></div>
       <div class="w-crop-frame"></div>
       <!-- Full color eye — progressive reveal synced with frame -->
       <div class="w-white-overlay" style="position:absolute; top:0; left:0; width:100px; height:67px; opacity:1; z-index:4;">
