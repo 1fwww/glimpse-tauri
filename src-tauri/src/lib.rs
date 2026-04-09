@@ -457,6 +457,14 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
 fn grab_selected_text() -> String {
     use std::process::Command;
 
+    // Check if Accessibility is granted (required for keystroke simulation)
+    let ax_trusted = commands::permissions::check_accessibility_trusted();
+    eprintln!("[GrabText] AXIsProcessTrusted={}", ax_trusted);
+    if !ax_trusted {
+        eprintln!("[GrabText] Accessibility not granted, skipping text grab");
+        return String::new();
+    }
+
     // Save current clipboard
     let saved = Command::new("pbpaste").output().ok()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
@@ -492,6 +500,8 @@ fn grab_selected_text() -> String {
             }
         }
     }
+
+    eprintln!("[GrabText] result: {} chars, empty={}", selected.len(), selected.is_empty());
 
     // Restore original clipboard
     let _ = Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn()

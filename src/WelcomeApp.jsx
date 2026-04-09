@@ -77,7 +77,16 @@ export default function WelcomeApp() {
       }
     }), 100)
     const interval = setInterval(checkPermissions, 2000)
-    return () => { clearTimeout(init); clearInterval(interval) }
+    // Also check when user switches back from System Settings
+    const onFocus = () => checkPermissions()
+    const onVisible = () => { if (!document.hidden) checkPermissions() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearTimeout(init); clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   useEffect(() => {

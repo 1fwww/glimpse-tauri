@@ -178,21 +178,41 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(w) = app.get_webview_window("chat") {
-        // Chat exists (pre-warmed or hidden) — reposition if offscreen, then show + focus
-        if let Ok(pos) = w.outer_position() {
-            let scale = w.current_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(2.0);
-            let x = pos.x as f64 / scale;
-            if x < -1000.0 {
-                // Offscreen (pre-warmed) — move to screen center
-                if let Some(m) = app.primary_monitor().ok().flatten() {
+        // Chat exists (pre-warmed or hidden) — reposition to cursor's monitor, then show
+        let is_hidden = !w.is_visible().unwrap_or(true);
+        if is_hidden {
+            // Find monitor at cursor position
+            let cursor = core_graphics::event_source::CGEventSource::new(
+                core_graphics::event_source::CGEventSourceStateID::CombinedSessionState,
+            ).ok().and_then(|s| core_graphics::event::CGEvent::new(s).ok())
+            .map(|e| e.location());
+
+            let monitors = app.available_monitors().unwrap_or_default();
+            let monitor = if let Some(pos) = cursor {
+                monitors.iter().find(|m| {
+                    let mp = m.position();
+                    let ms = m.size();
                     let s = m.scale_factor();
-                    let sw = m.size().width as f64 / s;
-                    let sh = m.size().height as f64 / s;
-                    let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                        x: (sw - 432.0) / 2.0,
-                        y: (sh - 412.0) / 2.0,
-                    }));
-                }
+                    let mx = mp.x as f64 / s;
+                    let my = mp.y as f64 / s;
+                    let mw = ms.width as f64 / s;
+                    let mh = ms.height as f64 / s;
+                    pos.x >= mx && pos.x < mx + mw && pos.y >= my && pos.y < my + mh
+                }).or_else(|| monitors.first())
+            } else {
+                monitors.first()
+            };
+
+            if let Some(m) = monitor {
+                let s = m.scale_factor();
+                let mx = m.position().x as f64 / s;
+                let my = m.position().y as f64 / s;
+                let sw = m.size().width as f64 / s;
+                let sh = m.size().height as f64 / s;
+                let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                    x: mx + (sw - 432.0) / 2.0,
+                    y: my + (sh - 412.0) / 2.0,
+                }));
             }
         }
         let _ = w.show();

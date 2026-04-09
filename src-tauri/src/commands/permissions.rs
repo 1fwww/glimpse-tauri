@@ -54,10 +54,21 @@ fn check_screen_recording() -> bool {
 
 #[cfg(target_os = "macos")]
 fn check_accessibility() -> bool {
+    check_accessibility_trusted()
+}
+
+/// Public accessor for AXIsProcessTrusted (used by grab_selected_text)
+#[cfg(target_os = "macos")]
+pub fn check_accessibility_trusted() -> bool {
     extern "C" {
         fn AXIsProcessTrusted() -> bool;
     }
     unsafe { AXIsProcessTrusted() }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn check_accessibility_trusted() -> bool {
+    true
 }
 
 #[cfg(not(target_os = "macos"))]
