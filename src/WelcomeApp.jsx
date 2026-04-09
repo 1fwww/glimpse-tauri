@@ -8,7 +8,7 @@ export default function WelcomeApp() {
     // so if step was saved as 3+ (completed), it's stale — reset to 0
     const saved = localStorage.getItem('welcome-step')
     const val = saved ? parseInt(saved, 10) : 0
-    return val >= 3 ? 0 : val
+    return val > 4 ? 0 : val
   })
   const [permissions, setPermissions] = useState({ screen: false, accessibility: false })
   const [checking, setChecking] = useState(false)
@@ -272,26 +272,64 @@ export default function WelcomeApp() {
 
             <p className="welcome-hint">Add an API key in <button className="welcome-hint-link" onClick={() => window.electronAPI?.openSettings?.()}>Settings</button> or use an invite code to chat.</p>
 
+            <button className="welcome-btn" onClick={() => setStep(4)}>Got it</button>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className={`welcome-step step-${stepDirection}`}>
+            <h2 className="welcome-subtitle">You're all set</h2>
+            <p className="welcome-desc">Glimpse lives in your menu bar.</p>
+
+            <div className="tray-reveal playing" key="tray-reveal">
+              <div className="tray-reveal-eye">
+                <svg viewBox="60 140 420 280" width={100} height={67}>
+                  <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+                  <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
+                </svg>
+                <div className="tray-reveal-crop" />
+                <div className="tray-reveal-dim" />
+                <div className="tray-reveal-snap">
+                  <svg viewBox="230 180 220 220" width={52} height={52}>
+                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="currentColor" strokeWidth="22" strokeLinecap="round" />
+                    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="24" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+              <div className="tray-reveal-hint">
+                <span>Find</span>
+                <span className="tray-reveal-hint-icon">
+                  <svg viewBox="230 180 220 220" width={12} height={9}>
+                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round" />
+                    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span>in your menu bar.</span>
+              </div>
+            </div>
+
             <button className="welcome-btn" onClick={handleGetStarted}>Start Using Glimpse</button>
           </div>
         )}
 
       </div>
-      <div className="welcome-footer">
-        <div className="welcome-dots" role="tablist" aria-label="Setup steps">
-          {['Intro', 'Permissions', 'Shortcuts', 'Pin'].map((label, i) => (
-            <button
-              key={i}
-              role="tab"
-              aria-label={`Step ${i + 1}: ${label}`}
-              aria-selected={step === i}
-              className={`welcome-dot ${step === i ? 'active' : ''} ${step === 3 && i === 3 ? 'dot-pulse' : ''}`}
-              onClick={() => { if (i <= step) setStep(i) }}
-              disabled={i > step}
-            />
-          ))}
+      {step > 0 && (
+        <div className="welcome-footer">
+          <div className="welcome-dots" role="tablist" aria-label="Setup steps">
+            {['Permissions', 'Shortcuts', 'Pin', 'Finish'].map((label, i) => (
+              <button
+                key={i}
+                role="tab"
+                aria-label={`Step ${i + 1}: ${label}`}
+                aria-selected={step === i + 1}
+                className={`welcome-dot ${step === i + 1 ? 'active' : ''}`}
+                onClick={() => { if (i + 1 <= step) setStep(i + 1) }}
+                disabled={i + 1 > step}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

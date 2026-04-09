@@ -2818,6 +2818,149 @@
   color: var(--text-secondary);
 }
 
+/* ── Tray Reveal Animation (Welcome Step 4) ── */
+.tray-reveal {
+  position: relative;
+  width: 280px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tray-reveal-eye {
+  position: relative;
+  width: 100px;
+  height: 67px;
+  opacity: 0;
+}
+
+.tray-reveal-crop {
+  position: absolute;
+  top: 10px;
+  left: 40px;
+  width: 52px;
+  height: 52px;
+  border: 1.5px solid rgba(108, 99, 255, 0);
+  border-radius: 4px;
+  z-index: 5;
+}
+
+.tray-reveal-dim {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  height: 67px;
+  background: var(--surface-base);
+  opacity: 0;
+  z-index: 3;
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 100%, 0% 100%,
+    0% 0%,
+    0% 14.9%,
+    40% 14.9%,
+    40% 92.5%,
+    92% 92.5%,
+    92% 14.9%,
+    0% 14.9%
+  );
+}
+
+.tray-reveal-snap {
+  position: absolute;
+  top: 10px;
+  left: 40px;
+  width: 52px;
+  height: 52px;
+  opacity: 0;
+  z-index: 4;
+  overflow: hidden;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+.tray-reveal-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  white-space: nowrap;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tray-reveal-hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  background: var(--brand-dim);
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+
+/* Animation sequence */
+.tray-reveal.playing .tray-reveal-eye {
+  animation: trayEyeIn 0.4s ease-out forwards;
+}
+
+.tray-reveal.playing .tray-reveal-crop {
+  animation: trayCropExpand 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.7s forwards;
+}
+
+.tray-reveal.playing .tray-reveal-dim {
+  animation: trayDimIn 0.1s ease-out 1.4s forwards;
+}
+
+.tray-reveal.playing .tray-reveal-snap {
+  animation: traySnapIn 0.1s ease-out 1.4s forwards;
+}
+
+.tray-reveal.playing .tray-reveal-hint {
+  animation: trayHintIn 0.4s ease-out 1.9s forwards;
+}
+
+@keyframes trayEyeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes trayCropExpand {
+  0% {
+    border-color: rgba(108, 99, 255, 0.5);
+    width: 0px;
+    height: 0px;
+    opacity: 1;
+  }
+  100% {
+    border-color: rgba(108, 99, 255, 0.5);
+    width: 52px;
+    height: 52px;
+    opacity: 1;
+  }
+}
+
+@keyframes trayDimIn {
+  from { opacity: 0; }
+  to { opacity: 0.88; }
+}
+
+@keyframes traySnapIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes trayHintIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 .welcome-settings-hint {
   margin: 0;
   font-family: var(--font-display);
