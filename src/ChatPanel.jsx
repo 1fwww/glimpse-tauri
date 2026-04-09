@@ -9,8 +9,9 @@ const BROW_FOCUSED = "M98 192C200 192 350 204 420 234"
 
 const GlimpseIcon = ({ size = 20, focused = false }) => (
   <svg viewBox="60 140 420 280" width={size} height={Math.round(size * 280 / 420)}>
-    {/* Eyebrow — instant swap between resting and focused */}
-    <path d={focused ? BROW_FOCUSED : BROW_RESTING} fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+    {/* Eyebrow — crossfade between resting and focused */}
+    <path d={BROW_RESTING} fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: focused ? 0 : 1, transition: 'opacity 0.3s ease' }} />
+    <path d={BROW_FOCUSED} fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: focused ? 1 : 0, transition: 'opacity 0.3s ease' }} />
     <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
   </svg>
 )
@@ -636,14 +637,14 @@ export default function ChatPanel({
       {/* Header — drag handle */}
       <div className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
         <span
-          className={`glimpse-icon-fixed ${eyeAnim === 'blink' ? 'logo-blink playing' : eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-blink playing' : ''}`}
+          className={`glimpse-icon-fixed chat-header-eye ${eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-single-blink' : ''}`}
           onClick={(e) => {
             e.stopPropagation()
             if (!isLoading && !eyeAnim) {
               setEyebrowWiggle(false)
               void e.currentTarget.offsetWidth
               setEyebrowWiggle(true)
-              setTimeout(() => setEyebrowWiggle(false), 900)
+              setTimeout(() => setEyebrowWiggle(false), 500)
             }
           }}
           style={{ cursor: 'pointer' }}
