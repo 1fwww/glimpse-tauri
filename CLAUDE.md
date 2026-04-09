@@ -146,6 +146,21 @@ pkill -f "[Gg]limpse"; lsof -ti:5173 | xargs kill -9
 
 ## TODO
 
-- [ ] Screenshot → Pinned chat transition slow (~1s delay). Root cause: creates new webview + React init on every pin. Fix: pre-warm chat window at startup (hidden, offscreen) so pin only needs reposition + show. Prior attempt caused screenshot shortcut bug — needs careful window lifecycle management.
-- [ ] Screenshot selection drag smoothness (mousemove triggers full React re-render with large image)
-- [ ] Fullscreen overlay may still appear on wrong Space after hide+delayed-close prewarm
+### Screenshot Selection Performance (P0)
+Three-step approach, do in order, stop when "good enough":
+1. **rAF throttle** — Wrap mousemove handler in `requestAnimationFrame`. 5 min, zero risk. Prevents >60fps event flooding.
+2. **useRef + DOM direct** — Store selection in `useRef`, update DOM elements directly (`.style.transform`), only `setState` on mouseup. Medium risk: selection bounds are read by chat panel positioning, toolbar positioning, cropped image calc, window hover detection — all need to read from ref instead of state.
+3. **Native NSView selection** — Replace WebView selection with Rust/objc2 Core Graphics overlay for the selection phase only. Mouseup passes bounds to WebView for chat+annotation. Does NOT require changing activation policy, Space logic, or ESC detection — only replaces the rendering layer. 3-5 days. All major screenshot tools (CleanShot, Shottr, Lark) use native selection. This is the only way to match their smoothness.
+
+### Screenshot → Pin Transition (P1)
+~1s delay. Root cause: creates new webview + React init on every pin. Fix: pre-warm chat window at startup (hidden, offscreen) so pin only needs reposition + show. Prior attempt caused screenshot shortcut bug — needs careful window lifecycle management. Do NOT change `close_chat_window` to hide (tried, caused issues). Instead: create chat window offscreen during startup prewarm phase, after overlay prewarm.
+
+### Tray + Home Window (P1)
+- Home window removed, tray is primary interface
+- After onboarding completes, dock icon disappears (Accessory mode) — user has no visible entry if tray permission not granted
+- Options: (a) open chat window after onboarding, (b) guide user to enable Menu Bar permission, (c) keep Home window as fallback
+- macOS Tahoe requires "Allow in Menu Bar" in System Settings → Menu Bar for tray to appear
+- Tray menu has dynamic recent chats (rebuilds on thread save/delete)
+
+### Fullscreen Space (P2)
+Overlay may still appear on wrong Space after hide+delayed-close prewarm.
