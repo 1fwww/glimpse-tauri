@@ -384,45 +384,10 @@ pub fn welcome_done(app: AppHandle) {
     let onboarding_path = data_dir.join("onboarding-done");
     fs::write(&onboarding_path, chrono_now()).ok();
 
-    // Get welcome window center so home opens at the same position
-    let welcome_center = app.get_webview_window("welcome").and_then(|w| {
-        let pos = w.outer_position().ok()?;
-        let size = w.outer_size().ok()?;
-        let scale = w.current_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(2.0);
-        Some((
-            pos.x as f64 / scale + size.width as f64 / scale / 2.0,
-            pos.y as f64 / scale + size.height as f64 / scale / 2.0,
-        ))
-    });
-
     if let Some(w) = app.get_webview_window("welcome") {
         let _ = w.close();
     }
-
-    // Position home centered on where welcome was
-    if let Some((cx, cy)) = welcome_center {
-        let home_w = 380.0;
-        let home_h = 560.0;
-        let x = cx - home_w / 2.0;
-        let y = cy - home_h / 2.0;
-        if let Ok(win) = WebviewWindowBuilder::new(&app, "home", WebviewUrl::App("index.html#home".into()))
-            .title("Glimpse")
-            .inner_size(home_w, home_h)
-            .position(x, y)
-            .resizable(false)
-            .decorations(false)
-            .transparent(true)
-            .accept_first_mouse(true)
-            .build()
-        {
-            let w = win.clone();
-            let _ = win.run_on_main_thread(move || {
-                crate::native_mac::set_transparent_background(&w);
-            });
-        }
-    } else {
-        let _ = create_home_window(&app);
-    }
+    // No Home window — tray icon is the interface from here
 }
 
 #[tauri::command]

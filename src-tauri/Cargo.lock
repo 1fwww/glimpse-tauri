@@ -1717,7 +1717,7 @@ dependencies = [
 
 [[package]]
 name = "glimpse"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -4885,6 +4885,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
+ "image",
  "jni",
  "libc",
  "log",

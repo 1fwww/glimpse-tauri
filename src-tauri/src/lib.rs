@@ -70,11 +70,10 @@ pub fn run() {
 
             // Check onboarding status
             let onboarding_path = data_dir.join("onboarding-done");
-            if onboarding_path.exists() {
-                windows::create_home_window(&app.handle())?;
-            } else {
+            if !onboarding_path.exists() {
                 windows::create_welcome_window(&app.handle())?;
             }
+            // No Home window — tray icon is the primary interface
 
             // Register global shortcuts
             let screenshot_shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyZ);
@@ -134,19 +133,13 @@ pub fn run() {
                     api.prevent_exit();
                 }
                 tauri::RunEvent::Reopen { .. } => {
-                    // Dock icon clicked — show home if no windows visible
+                    // Dock icon clicked — open chat if no windows visible
                     let has_visible = app.webview_windows().values().any(|w| {
                         let label = w.label();
-                        // Skip hidden pre-warmed overlay
                         label != "overlay" && w.is_visible().unwrap_or(false)
                     });
                     if !has_visible {
-                        let data_dir = get_data_dir();
-                        if data_dir.join("onboarding-done").exists() {
-                            let _ = windows::create_home_window(app);
-                        } else {
-                            let _ = windows::create_welcome_window(app);
-                        }
+                        let _ = windows::create_chat_window(app);
                     }
                 }
                 _ => {}

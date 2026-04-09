@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 pub fn check_permissions() -> Result<Value, String> {
     let screen = check_screen_recording();
     let accessibility = check_accessibility();
+    eprintln!("[Permissions] screen={}, accessibility={}", screen, accessibility);
     Ok(json!({
         "screen": screen,
         "accessibility": accessibility

@@ -62,6 +62,7 @@ export default function WelcomeApp() {
 
   const allGranted = permissions.screen && permissions.accessibility
 
+
   const handleGetStarted = () => {
     localStorage.removeItem('welcome-step')
     window.electronAPI?.welcomeDone()
