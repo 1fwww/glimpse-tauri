@@ -7,11 +7,11 @@
 
 ## 1. Design Principles
 
-1. **Disappear when not needed.** Glimpse is a utility, not a destination.
-2. **Calm over clever.** No pulsing glows, no aggressive animations. Motion should feel physical and natural.
-3. **Warm, not clinical.** Soft radii, gentle contrast, muted-but-warm tones.
-4. **Respect the user's focus.** Minimize cognitive load. Clear hierarchy, obvious actions.
-5. **Accessible by default.** WCAG AA minimum. Color blindness safe. Reduced motion support.
+1. **Respect the user's focus.** Glimpse is a utility, not a destination. Show up, help, get out of the way. Less, then less again.
+2. **Feel native, not web.** Respect macOS conventions. Tray icons, ESC to close, pixel-perfect edges. Users should never think "this is a webpage in a window."
+3. **Tangible over digital.** Physical metaphors: pins that rotate in, surfaces that feel like frosted glass, an eye that blinks. No glowing gradients, no color washes, no "screen filter" effects.
+4. **The eye is the product.** The Glimpse companion isn't a logo — it's a personality. Resting, focused, thinking, delighted. Every state change is an opportunity for the eye to respond.
+5. **Accessible by default.** WCAG AA minimum. Color blindness safe. Reduced motion support. If it's interactive, it has a label.
 
 ---
 
