@@ -299,7 +299,7 @@ export default function SettingsApp() {
         </div>
       </div>
       <div className="settings-footer">
-        <span className="settings-version">Glimpse v1.0</span>
+        <span className="settings-version">Glimpse v0.2.0</span>
         <button className="settings-esc-btn" onClick={handleClose}><kbd>Esc</kbd> to close</button>
       </div>
     </div>
