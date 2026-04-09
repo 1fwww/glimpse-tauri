@@ -228,7 +228,7 @@ export default function WelcomeApp() {
             <h2 className="welcome-subtitle">Pin to screen</h2>
             <p className="welcome-desc">Keep the chat visible while you work.</p>
 
-            <div className="pin-demo" onClick={() => setPinnedEgg(p => !p)}>
+            <div className="pin-demo">
               <div className="pin-demo-bg">
                 {[95, 80, 95, 60, 0, 95, 80, 60].map((w, i) => (
                   <div key={i} className="pin-demo-line" style={w ? { width: `${w}%` } : { height: 12, background: 'transparent' }} />
@@ -237,13 +237,14 @@ export default function WelcomeApp() {
               <div className={`pin-demo-panel ${pinnedEgg ? 'pin-demo-pinned' : ''}`}>
                 <div className="pin-demo-header">
                   <svg viewBox="60 140 420 280" width={16} height={11} style={{ flexShrink: 0 }}>
-                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" />
+                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: pinnedEgg ? 0 : 1, transition: 'opacity 0.3s ease' }} />
+                    <path d="M98 192C200 192 350 204 420 234" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round" style={{ opacity: pinnedEgg ? 1 : 0, transition: 'opacity 0.3s ease' }} />
                     <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round" />
                   </svg>
-                  <span className="pin-demo-title">New Thread</span>
+                  <span className="pin-demo-title">New Chat</span>
                   <div style={{ flex: 1 }} />
                   <button className={`pin-demo-pin ${pinnedEgg ? 'pin-demo-pin-active' : ''}`} onClick={(e) => { e.stopPropagation(); setPinnedEgg(p => !p) }}>
-                    <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ transform: pinnedEgg ? 'rotate(0deg)' : 'rotate(20deg)', transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
                       <path d="M12 17v5" /><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24z" />
                     </svg>
                   </button>

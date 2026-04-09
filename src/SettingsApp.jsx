@@ -149,7 +149,7 @@ export default function SettingsApp() {
           {apiKeys.isInvite && (
             <div className="settings-invite-row">
               <span className="settings-invite-badge">Using invite code</span>
-              <button className="settings-btn-sm" onClick={async () => {
+              <button className="settings-invite-link" onClick={async () => {
                 await window.electronAPI?.deleteApiKey('invite')
                 loadData()
               }}>Use my own keys</button>
@@ -179,6 +179,7 @@ export default function SettingsApp() {
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveKey(p.id)}
                         autoFocus
                         spellCheck={false}
+                        aria-label={`${p.label} API key`}
                       />
                       <div className="settings-key-actions">
                         <button className="settings-btn-sm" onClick={() => handleSaveKey(p.id)} disabled={saving}>
@@ -220,6 +221,7 @@ export default function SettingsApp() {
                     onKeyDown={(e) => e.key === 'Enter' && handleInviteCode()}
                     autoFocus
                     spellCheck={false}
+                    aria-label="Invite code"
                   />
                   <button className="settings-btn-sm" onClick={handleInviteCode} disabled={inviteSaving}>
                     {inviteSaving ? '...' : 'Apply'}
@@ -250,6 +252,9 @@ export default function SettingsApp() {
             <button
               className={`settings-toggle ${prefs.launchAtLogin ? 'on' : ''}`}
               onClick={handleToggleLaunchAtLogin}
+              role="switch"
+              aria-checked={prefs.launchAtLogin}
+              aria-label="Launch at login"
             >
               <div className="settings-toggle-knob" />
             </button>

@@ -689,8 +689,11 @@ export default function ChatPanel({
         </div>
         <Tooltip text="New chat">
           <button
-            className="chat-header-new"
-            onClick={() => { onNewThread(); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim() }}
+            className={`chat-header-new`}
+            onClick={(e) => {
+              onNewThread(); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim()
+              const btn = e.currentTarget; btn.classList.add('press'); setTimeout(() => btn.classList.remove('press'), 150)
+            }}
             aria-label="New chat"
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
@@ -753,7 +756,7 @@ export default function ChatPanel({
             }}>
               <GlimpseIcon size={32} />
             </span>
-            <span>Key added. Happy chatting!</span>
+            <span>Connected. Happy Glimpsing!</span>
           </div>
         ) : (
           <>
@@ -997,9 +1000,9 @@ export default function ChatPanel({
                 {modelMenuOpen && modelMenuPos && (() => {
                   return ReactDOM.createPortal(
                     <div className="model-dropdown" role="menu" aria-label="Model selection" style={{ position: 'fixed', bottom: modelMenuPos.bottom, right: modelMenuPos.right }}>
-                      {availableProviders.map(p => (
+                      {availableProviders.map((p, pi) => (
                         <div key={p.id}>
-                          <div className="model-dropdown-provider">{p.name}</div>
+                          {availableProviders.length > 1 && <div className={`model-dropdown-section ${pi > 0 ? 'model-dropdown-section-divider' : ''}`}>{p.name}</div>}
                           {p.models?.map(m => (
                             <button
                               key={m.id}

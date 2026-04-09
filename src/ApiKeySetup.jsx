@@ -77,7 +77,7 @@ export default function ApiKeySetup({ onDone, onSkip }) {
                   >
                     <span>{p.name}</span>
                     {savedProviders.includes(p.id) ? (
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#34c759" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
+                      <svg className="check-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
                     ) : (
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
                     )}
@@ -105,6 +105,7 @@ export default function ApiKeySetup({ onDone, onSkip }) {
                   onKeyDown={handleKeyDown}
                   spellCheck={false}
                   autoFocus
+                  aria-label={`${PROVIDERS.find(p => p.id === selectedProvider)?.name} API key`}
                 />
                 {!error && (
                   <span className="api-key-hint">
@@ -134,7 +135,8 @@ export default function ApiKeySetup({ onDone, onSkip }) {
               onKeyDown={handleKeyDown}
               spellCheck={false}
               autoFocus
-              style={{ fontFamily: 'var(--font-display)' }}
+              aria-label="Invite code"
+              className="invite-code-input"
             />
           </div>
 

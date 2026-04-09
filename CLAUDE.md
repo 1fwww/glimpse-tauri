@@ -146,6 +146,6 @@ pkill -f "[Gg]limpse"; lsof -ti:5173 | xargs kill -9
 
 ## TODO
 
-- [ ] Screenshot → Pinned chat transition not smooth enough (visual jump/flicker during pin)
+- [ ] Screenshot → Pinned chat transition slow (~1s delay). Root cause: creates new webview + React init on every pin. Fix: pre-warm chat window at startup (hidden, offscreen) so pin only needs reposition + show. Prior attempt caused screenshot shortcut bug — needs careful window lifecycle management.
 - [ ] Screenshot selection drag smoothness (mousemove triggers full React re-render with large image)
 - [ ] Fullscreen overlay may still appear on wrong Space after hide+delayed-close prewarm
