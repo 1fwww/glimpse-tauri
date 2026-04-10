@@ -481,7 +481,7 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         }
         // Now show chat (instant if pre-warmed)
         let has_context = !selected_text.is_empty();
-        let height_hint = if has_context { Some(300.0) } else { None };
+        let height_hint = if has_context { Some(320.0) } else { None };
         let _ = windows::create_chat_window(&app_clone, height_hint);
         if let Some(w) = app_clone.get_webview_window("chat") {
             if has_context {

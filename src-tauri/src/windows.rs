@@ -151,6 +151,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
         .inner_size(432.0, 280.0)
+        .min_inner_size(360.0, 260.0)
         .position(-9999.0, -9999.0) // offscreen but visible (WebKit needs visible to run JS)
         .resizable(true)
         .decorations(false)
@@ -259,10 +260,11 @@ pub fn create_chat_window(app: &AppHandle, height_hint: Option<f64>) -> Result<(
         });
         return Ok(());
     }
-    let fresh_h = height_hint.unwrap_or(140.0);
+    let fresh_h = height_hint.unwrap_or(280.0);
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
         .inner_size(432.0, fresh_h)  // +12 for 6px padding each side
+        .min_inner_size(360.0, 260.0)
         .resizable(true)
         .decorations(false)
         .transparent(true)
@@ -665,6 +667,7 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
                 .title("Glimpse Chat")
                 .position(cx, cy)
                 .inner_size(cw, ch)
+                .min_inner_size(360.0, 260.0)
                 .resizable(true)
                 .decorations(false)
                 .transparent(true)

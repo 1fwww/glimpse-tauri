@@ -7,7 +7,7 @@ import ApiKeySetup from './ApiKeySetup'
 export const CHAT_SIZES = {
   // ─── Compact heights (based on measured chrome) ───
   COMPACT_EMPTY: 280,       // 183 fixed + 80 messages min + 17 breathing
-  COMPACT_QUOTE: 300,       // + 37px snippet in input area
+  COMPACT_QUOTE: 320,       // 183 chrome + 80 messages min + 37 snippet + 20 safety
   COMPACT_SCREENSHOT: 300,  // + 38px attachment cue in input area
   COMPACT_BOTH: 340,        // + both attachments
 
@@ -180,6 +180,7 @@ export default function ChatPanel({
 
     // Skip reload when a new thread just gets its first ID (preserve in-session images)
     if (!isNewThreadGettingId) {
+      isInitialLoad.current = true  // loading from thread = initial load (allow auto-resize)
       if (currentThread?.messages?.length > 0) {
         setMessages(currentThread.messages.map(m => {
           if (m.role === 'assistant') {
@@ -216,19 +217,22 @@ export default function ChatPanel({
   }, [currentThread?.id])
 
   // Existing chat with messages: resize to content-appropriate size immediately (no animation)
+  // Only triggers on initial load (opening existing chat), NOT on new messages sent in a live session
   const initialSizeSet = useRef(false)
+  const isInitialLoad = useRef(true)
   useEffect(() => {
-    if (messages.length > 0 && !initialSizeSet.current && messagesContainerRef.current) {
+    if (messages.length > 0 && !initialSizeSet.current && isInitialLoad.current && messagesContainerRef.current) {
       initialSizeSet.current = true
       const contentH = messagesContainerRef.current.scrollHeight
-      const chromeH = CHAT_SIZES.HEADER_HEIGHT + CHAT_SIZES.INPUT_HEIGHT + CHAT_SIZES.PADDING
+      const chromeH = CHAT_SIZES.CHROME_FIXED
       const targetH = Math.min(contentH + chromeH, CHAT_SIZES.EXPANDED_MAX)
       window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: targetH, force: true })
       setChatFullSize(true)
     }
-    // Reset flag when thread changes to allow re-sizing
+    // Reset flags when thread changes to allow re-sizing
     if (messages.length === 0) {
       initialSizeSet.current = false
+      isInitialLoad.current = false  // from now on, messages are live additions
     }
   }, [messages.length > 0])
 
@@ -537,11 +541,12 @@ export default function ChatPanel({
       image: willAttachImage ? imageForChat : null,
       snippet: sentSnippet,
     }
+    isInitialLoad.current = false  // mark as live session — prevent existing-chat resize logic
     setMessages(prev => [...prev, uiMsg])
     setIsLoading(true)
 
-    // Scroll to bottom when user sends
-    setTimeout(() => scrollToBottom(), 50)
+    // Scroll to bottom when user sends (only if expanded — compact mode shouldn't auto-scroll)
+    if (chatFullSize) setTimeout(() => scrollToBottom(), 50)
 
     if (willAttachImage) {
       lastSentImageRef.current = croppedImage
@@ -803,7 +808,7 @@ export default function ChatPanel({
           <button
             className={`chat-header-new`}
             onClick={(e) => {
-              onNewThread(); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim()
+              onNewThread(); setChatFullSize(false); window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.COMPACT_WIDTH, height: CHAT_SIZES.COMPACT_EMPTY, force: true }); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim()
               const btn = e.currentTarget; btn.classList.add('press'); setTimeout(() => btn.classList.remove('press'), 150)
             }}
             aria-label="New chat"
