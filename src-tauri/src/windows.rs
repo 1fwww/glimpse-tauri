@@ -150,7 +150,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("[Chat] Pre-warming chat webview...");
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
-        .inner_size(432.0, 320.0)
+        .inner_size(432.0, 280.0)
         .position(-9999.0, -9999.0) // offscreen but visible (WebKit needs visible to run JS)
         .resizable(true)
         .decorations(false)
@@ -176,7 +176,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_chat_window(app: &AppHandle, height_hint: Option<f64>) -> Result<(), Box<dyn std::error::Error>> {
     // On fullscreen Space, pre-warmed window can't be moved there — must create fresh
     if crate::native_mac::is_fullscreen_space() {
         eprintln!("[Chat] fullscreen Space detected, destroying pre-warmed chat");
@@ -193,8 +193,9 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         // Chat exists (pre-warmed or hidden) — reposition to cursor's monitor, then show
         let is_hidden = !w.is_visible().unwrap_or(true);
         if is_hidden {
-            // Reset to compact size for fresh open (frontend will resize if needed)
-            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 432.0, height: 320.0 }));
+            // Reset to appropriate size for fresh open
+            let h = height_hint.unwrap_or(280.0);
+            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 432.0, height: h }));
             // Find monitor at cursor position
             let cursor = core_graphics::event_source::CGEventSource::new(
                 core_graphics::event_source::CGEventSourceStateID::CombinedSessionState,
@@ -224,7 +225,7 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
                 let sw = m.size().width as f64 / s;
                 let sh = m.size().height as f64 / s;
                 // Get actual window size (may have been resized)
-                let (ww, wh) = w.outer_size().map(|s| (s.width as f64 / w.scale_factor().unwrap_or(1.0), s.height as f64 / w.scale_factor().unwrap_or(1.0))).unwrap_or((432.0, 320.0));
+                let (ww, wh) = w.outer_size().map(|s| (s.width as f64 / w.scale_factor().unwrap_or(1.0), s.height as f64 / w.scale_factor().unwrap_or(1.0))).unwrap_or((432.0, 280.0));
                 // Center on monitor, clamped to screen bounds
                 let x = (mx + (sw - ww) / 2.0).max(mx).min(mx + sw - ww);
                 let y = (my + (sh - wh) / 2.0).max(my).min(my + sh - wh);
@@ -258,9 +259,10 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         });
         return Ok(());
     }
+    let fresh_h = height_hint.unwrap_or(140.0);
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
-        .inner_size(432.0, 320.0)  // +12 for 6px padding each side
+        .inner_size(432.0, fresh_h)  // +12 for 6px padding each side
         .resizable(true)
         .decorations(false)
         .transparent(true)
@@ -617,7 +619,21 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
     let chat_exists = app.get_webview_window("chat").is_some();
 
     eprintln!("[Pin] chat_exists={}, chat_ready={}", chat_exists, chat_ready);
-    if chat_exists && chat_ready {
+
+    // On fullscreen Space, pre-warmed chat can't show — destroy and let slow path recreate
+    // Only destroy if it was pre-warmed (hidden), not if we just created it
+    let chat_is_hidden = app.get_webview_window("chat").map(|w| !w.is_visible().unwrap_or(true)).unwrap_or(false);
+    if chat_exists && chat_is_hidden && crate::native_mac::is_fullscreen_space() {
+        eprintln!("[Pin] fullscreen detected, destroying hidden pre-warmed chat for pin");
+        if let Some(w) = app.get_webview_window("chat") {
+            let _ = w.close();
+            for _ in 0..20 {
+                if app.get_webview_window("chat").is_none() { break; }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+        // Fall through to slow path below
+    } else if chat_exists && chat_ready {
         eprintln!("[Pin] FAST PATH — reposition + show");
         // Fast path — chat is pre-warmed, reposition + show immediately
         if let Some(w) = app.get_webview_window("chat") {
@@ -644,6 +660,7 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
     } else {
         // Slow path — create fresh chat window
         if !chat_exists {
+            // Create visible (WebKit won't run JS in hidden windows)
             let _ = WebviewWindowBuilder::new(&app, "chat", WebviewUrl::App("index.html#chat-only".into()))
                 .title("Glimpse Chat")
                 .position(cx, cy)
@@ -653,21 +670,22 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
                 .transparent(true)
                 .accept_first_mouse(true)
                 .always_on_top(true)
-                .visible(false)
                 .build();
             if let Some(win) = app.get_webview_window("chat") {
                 let w = win.clone();
+                let is_fs = crate::native_mac::is_fullscreen_space();
                 let _ = win.run_on_main_thread(move || {
                     crate::native_mac::set_transparent_background(&w);
                     crate::native_mac::set_window_shadow(&w, false);
+                    if is_fs {
+                        crate::native_mac::set_visible_on_fullscreen(&w, true);
+                        crate::native_mac::set_window_level_floating(&w);
+                    }
                 });
             }
         }
-        // Close overlay
-        if let Some(w) = app.get_webview_window("overlay") {
-            let _ = w.close();
-        }
-        // Wait for chat ready
+        // Wait for chat ready, SHOW FIRST, then close overlay
+        // (closing overlay in fullscreen can cause macOS to leave the Space)
         let app_pin = app.clone();
         std::thread::spawn(move || {
             CHAT_READY.store(false, Ordering::SeqCst);
@@ -683,6 +701,10 @@ pub fn pin_chat(app: AppHandle, thread_data: Option<serde_json::Value>, bounds: 
                 std::thread::sleep(std::time::Duration::from_millis(50));
                 let _ = w.show();
                 let _ = w.set_focus();
+            }
+            // Now close overlay (chat is already visible on the Space)
+            if let Some(w) = app_pin.get_webview_window("overlay") {
+                let _ = w.close();
             }
             let app_pw = app_pin.clone();
             std::thread::spawn(move || {
@@ -821,13 +843,14 @@ pub fn resize_chat_window(app: AppHandle, size: serde_json::Value) {
     if let Some(w) = app.get_webview_window("chat") {
         let new_w = size.get("width").and_then(|v| v.as_f64()).unwrap_or(420.0);
         let new_h = size.get("height").and_then(|v| v.as_f64()).unwrap_or(550.0);
-        // Only grow, never shrink
+        let force = size.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
         if let Ok(current) = w.outer_size() {
             let scale = w.current_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(2.0);
             let cur_w = current.width as f64 / scale;
             let cur_h = current.height as f64 / scale;
-            let width = new_w.max(cur_w);
-            let height = new_h.max(cur_h);
+            // Only grow unless force is true
+            let width = if force { new_w } else { new_w.max(cur_w) };
+            let height = if force { new_h } else { new_h.max(cur_h) };
             if (height - cur_h).abs() < 1.0 && (width - cur_w).abs() < 1.0 {
                 return; // No change needed
             }
@@ -835,6 +858,11 @@ pub fn resize_chat_window(app: AppHandle, size: serde_json::Value) {
             if let Ok(pos) = w.outer_position() {
                 let mut x = pos.x as f64 / scale;
                 let mut y = pos.y as f64 / scale;
+                // Bottom-anchored expansion: grow upward (input box stays put)
+                let grow = height - cur_h;
+                if grow > 0.0 {
+                    y -= grow;
+                }
                 // Clamp to monitor bounds
                 if let Some(m) = w.current_monitor().ok().flatten() {
                     let ms = m.scale_factor();

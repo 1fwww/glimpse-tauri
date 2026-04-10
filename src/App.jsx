@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import ChatPanel from './ChatPanel'
+import ChatPanel, { CHAT_SIZES } from './ChatPanel'
 import EditToolbar from './EditToolbar'
 import DrawingCanvas from './DrawingCanvas'
 import useThreadManager from './useThreadManager'
@@ -554,8 +554,8 @@ export default function App() {
     const margin = 12
     const screenW = window.innerWidth
     const screenH = window.innerHeight
-    const compactHeight = 320
-    const expandedMax = 550
+    const compactHeight = croppedImage ? CHAT_SIZES.COMPACT_SCREENSHOT : CHAT_SIZES.COMPACT_EMPTY
+    const expandedMax = CHAT_SIZES.EXPANDED_MAX
 
     if (!selection) return { left: 0, bottom: margin, top: undefined, maxHeight: chatFullSize ? expandedMax : compactHeight }
 

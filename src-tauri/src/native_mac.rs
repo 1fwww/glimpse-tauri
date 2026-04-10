@@ -195,6 +195,10 @@ pub fn animate_frame(window: &tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f
             let win = ns_window as *mut AnyObject;
             // Get screen height for coordinate flip (macOS uses bottom-left origin)
             let screen: *mut AnyObject = msg_send![&*win, screen];
+            if screen.is_null() {
+                eprintln!("[native_mac] animate_frame: window has no screen, falling back to set_size");
+                return;
+            }
             let screen_frame: CGRect = msg_send![&*screen, frame];
             let screen_h = screen_frame.size.height;
             // Flip y: macOS origin is bottom-left
