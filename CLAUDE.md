@@ -108,6 +108,19 @@ pkill -f "[Gg]limpse"; lsof -ti:5173 | xargs kill -9
 
 **Fix**: On mount, check actual permission state via `checkPermissions()`. If permissions not granted and step > 1, force back to step 1.
 
+### Accessibility Permission TCC Mismatch
+**User experience**: User grants Accessibility in System Settings, but `AXIsProcessTrusted()` still returns false. Welcome flow always shows "Grant" button.
+
+**Cause**: macOS TCC matches permissions to the binary's code signing hash. Each `npx tauri build` produces a new ad-hoc signature with a different hash. The TCC database still holds the old hash, so the OS can't match the running process to the granted permission. Screen Recording (`CGPreflightScreenCaptureAccess`) is more lenient, but Accessibility (`AXIsProcessTrusted`) requires an exact match.
+
+**Fix**: Reset TCC and re-grant:
+```bash
+tccutil reset Accessibility com.yifuwu.glimpse
+```
+Then reopen the app and re-grant Accessibility. This is needed after every new build that changes the code signature.
+
+**Long-term fix**: Use a stable Developer ID signature (Apple Developer Program) so the code signing identity persists across builds.
+
 ### Screen Recording Permission Grant
 **User experience**: User clicks "Grant" button, dismisses the system dialog, clicks "Grant" again — nothing happens.
 
