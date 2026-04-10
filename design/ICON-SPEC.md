@@ -49,29 +49,30 @@ Right-side crop of the full logo with **rounded stroke ends** at the three left-
 ### Source SVG for tray (UPDATED — rounded ends)
 
 ```svg
-<svg viewBox="220 168 230 232" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
-  <!-- Brow: trimmed to start inside viewBox -->
-  <path d="M243 182C315 182 390 199 420 248" fill="none" stroke="black" stroke-width="26" stroke-linecap="round"/>
-  <!-- Body lower stub: short arc going left, round cap at end -->
-  <path d="M262 374C253 374 244 372 236 370" fill="none" stroke="black" stroke-width="28" stroke-linecap="round"/>
+<svg viewBox="212 168 238 232" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+  <!-- Brow: De Casteljau split, extended left for balance -->
+  <path d="M233 182C307 181 389 198 420 248" fill="none" stroke="black" stroke-width="26" stroke-linecap="round"/>
+  <!-- Body lower stub: counterweight, extends furthest left -->
+  <path d="M262 374C252 373 240 371 225 367" fill="none" stroke="black" stroke-width="28" stroke-linecap="round"/>
   <!-- Body main: re-enters from left + spiral -->
-  <path d="M245 253C296 237 351 234 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="black" stroke-width="28" stroke-linecap="round"/>
+  <path d="M234 257C288 237 349 232 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="black" stroke-width="28" stroke-linecap="round"/>
 </svg>
 ```
 
-### Key changes from previous version
-- **viewBox:** `220 168 230 232` (was `230 180 220 220`) — expanded left and top to accommodate round caps
-- **3 sub-paths** instead of 2 continuous paths — split at the two points where the body curve exits/re-enters the viewBox
-- **Stroke-linecap="round"** now visible at all endpoints — no more flat cuts
-- Stroke widths unchanged (26 for brow, 28 for body)
+### Key details
+- **viewBox:** `212 168 238 232` — room for all round caps
+- **3 sub-paths** split via De Casteljau from original curves, preserving exact curve direction
+- **Left endpoints staggered:** x=233 (brow), x=234 (body main), x=225 (stub) — top two nearly aligned, bottom extends furthest as visual counterweight for right-heavy spiral
+- **Stroke-linecap="round"** visible at all endpoints — no flat cuts
+- Stroke widths: 26 (brow), 28 (body)
 
 ### Also update: Welcome Step 4 inline tray icon
-The small inline icon in "Find [icon] in your menu bar" hint text should use the same updated paths and viewBox:
+The small inline icon in "Find [icon] in your menu bar" hint text should use the same paths and viewBox:
 ```jsx
-<svg viewBox="220 168 230 232" width="14" height="10" style={{display:'inline',verticalAlign:'middle'}}>
-  <path d="M243 182C315 182 390 199 420 248" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round"/>
-  <path d="M262 374C253 374 244 372 236 370" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round"/>
-  <path d="M245 253C296 237 351 234 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round"/>
+<svg viewBox="212 168 238 232" width="14" height="10" style={{display:'inline',verticalAlign:'middle'}}>
+  <path d="M233 182C307 181 389 198 420 248" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round"/>
+  <path d="M262 374C252 373 240 371 225 367" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round"/>
+  <path d="M234 257C288 237 349 232 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round"/>
 </svg>
 ```
 
