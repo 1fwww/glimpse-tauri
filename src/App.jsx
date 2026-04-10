@@ -78,6 +78,7 @@ export default function App() {
 
     const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset) => {
       setScreenImage(dataUrl)
+      tm.refreshProviders() // Ensure providers are current (key may have been added in chat-only)
       setDisplayInfo(dispInfo || null)
       setWindowOffset(offset || { x: 0, y: 0 })
       const off = offset || { x: 0, y: 0 }
