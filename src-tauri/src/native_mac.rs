@@ -54,6 +54,55 @@ pub fn set_move_to_active_space(window: &tauri::WebviewWindow) {
     }
 }
 
+
+/// Check if the current Space is a fullscreen Space using private CGS APIs.
+pub fn is_fullscreen_space() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        extern "C" {
+            fn CGSMainConnectionID() -> u32;
+            fn CGSGetActiveSpace(cid: u32) -> u64;
+            fn CGSSpaceGetType(cid: u32, space: u64) -> u32;
+        }
+        unsafe {
+            let cid = CGSMainConnectionID();
+            let space = CGSGetActiveSpace(cid);
+            let space_type = CGSSpaceGetType(cid, space);
+            // Type 0 = normal desktop, Type 4 = fullscreen
+            eprintln!("[native_mac] space check: id={}, type={}", space, space_type);
+            space_type == 4
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    { false }
+}
+
+/// Lock window to current Space only (FullScreenAuxiliary, no CanJoinAllSpaces).
+pub fn set_single_space(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        let ns_window = match window.ns_window() {
+            Ok(ptr) => ptr,
+            Err(e) => {
+                eprintln!("[native_mac] ns_window() failed: {}", e);
+                return;
+            }
+        };
+
+        unsafe {
+            let win = ns_window as *mut AnyObject;
+            // FullScreenAuxiliary only (1 << 8) — can float on fullscreen but stays on one Space
+            let behavior: u64 = 1 << 8;
+            let _: () = msg_send![&*win, setCollectionBehavior: behavior];
+            let actual: u64 = msg_send![&*win, collectionBehavior];
+            eprintln!("[native_mac] set_single_space: requested={}, actual={}", behavior, actual);
+        }
+    }
+}
+
 /// Set a window to be visible on all workspaces including fullscreen Spaces.
 pub fn set_visible_on_fullscreen(window: &tauri::WebviewWindow, visible: bool) {
     #[cfg(target_os = "macos")]

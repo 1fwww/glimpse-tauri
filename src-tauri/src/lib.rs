@@ -447,23 +447,22 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         }
     }
 
-    // If no visible windows, switch to Accessory policy for fullscreen Space support
-    let needs_policy = !app.get_webview_window("home").is_some()
-        && !app.get_webview_window("chat").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
-        && !app.get_webview_window("overlay").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
-    if needs_policy && !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
-        if let Some(ow) = app.get_webview_window("overlay")
-            .or_else(|| app.get_webview_window("chat")) {
+    // Switch to Accessory policy for fullscreen Space support
+    // (CanJoinAllSpaces alone isn't enough — fullscreen needs Accessory)
+    if !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
+        let any_window = app.get_webview_window("chat")
+            .or_else(|| app.get_webview_window("overlay"));
+        if let Some(w) = any_window {
             let app2 = app.clone();
             let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let done2 = done.clone();
-            let _ = ow.run_on_main_thread(move || {
+            let _ = w.run_on_main_thread(move || {
                 let _ = app2.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 done2.store(true, std::sync::atomic::Ordering::SeqCst);
             });
-            for _ in 0..50 {
+            for _ in 0..30 {
                 if done.load(std::sync::atomic::Ordering::SeqCst) { break; }
-                std::thread::sleep(std::time::Duration::from_millis(5));
+                std::thread::sleep(std::time::Duration::from_millis(2));
             }
             IS_ACCESSORY.store(true, std::sync::atomic::Ordering::SeqCst);
         }
@@ -475,11 +474,14 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         std::thread::sleep(std::time::Duration::from_millis(50));
         let selected_text = grab_selected_text();
 
+        // Clear stale state BEFORE showing chat (prevents flash of old content)
+        if let Some(w) = app_clone.get_webview_window("chat") {
+            let _ = w.emit("clear-screenshot", ());
+            let _ = w.emit("clear-text-context", ());
+        }
         // Now show chat (instant if pre-warmed)
         let _ = windows::create_chat_window(&app_clone);
         if let Some(w) = app_clone.get_webview_window("chat") {
-            // Clear stale screenshot from previous session
-            let _ = w.emit("clear-screenshot", ());
             if !selected_text.is_empty() {
                 let _ = w.emit("text-context", &selected_text);
             }
@@ -501,7 +503,7 @@ fn grab_selected_text() -> String {
     }
 
     // Save current clipboard
-    let saved = Command::new("pbpaste").output().ok()
+    let saved = Command::new("pbpaste").args(["-Prefer", "txt"]).output().ok()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
 
@@ -529,7 +531,7 @@ fn grab_selected_text() -> String {
     let mut selected = String::new();
     for _ in 0..10 {
         std::thread::sleep(std::time::Duration::from_millis(25));
-        if let Ok(output) = Command::new("pbpaste").output() {
+        if let Ok(output) = Command::new("pbpaste").args(["-Prefer", "txt"]).output() {
             let text = String::from_utf8_lossy(&output.stdout).to_string();
             if !text.is_empty() && text != sentinel {
                 selected = text;

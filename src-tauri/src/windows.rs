@@ -161,7 +161,6 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let _ = win.run_on_main_thread(move || {
         crate::native_mac::set_transparent_background(&w);
         crate::native_mac::set_window_shadow(&w, false);
-        crate::native_mac::set_visible_on_fullscreen(&w, true);
     });
     // Wait for React to init (may take a few seconds for WebView to load)
     CHAT_READY.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -178,6 +177,18 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    // On fullscreen Space, pre-warmed window can't be moved there — must create fresh
+    if crate::native_mac::is_fullscreen_space() {
+        eprintln!("[Chat] fullscreen Space detected, destroying pre-warmed chat");
+        if let Some(w) = app.get_webview_window("chat") {
+            let _ = w.close();
+            for _ in 0..20 {
+                if app.get_webview_window("chat").is_none() { break; }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+    }
+
     if let Some(w) = app.get_webview_window("chat") {
         // Chat exists (pre-warmed or hidden) — reposition to cursor's monitor, then show
         let is_hidden = !w.is_visible().unwrap_or(true);
@@ -220,8 +231,31 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
                 let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
             }
         }
+        // Show with CanJoinAllSpaces + floating, then lock to single Space
+        let w2 = w.clone();
+        let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let done2 = done.clone();
+        let _ = w.run_on_main_thread(move || {
+            crate::native_mac::set_visible_on_fullscreen(&w2, true);
+            crate::native_mac::set_window_level_floating(&w2);
+            crate::native_mac::order_front(&w2);
+            done2.store(true, std::sync::atomic::Ordering::Release);
+        });
+        for _ in 0..30 {
+            if done.load(std::sync::atomic::Ordering::Acquire) { break; }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
         let _ = w.show();
         let _ = w.set_focus();
+        // Lock to single Space after showing
+        let w3 = w.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            let w4 = w3.clone();
+            let _ = w3.run_on_main_thread(move || {
+                crate::native_mac::set_single_space(&w4);
+            });
+        });
         return Ok(());
     }
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))

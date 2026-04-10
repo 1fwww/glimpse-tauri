@@ -340,9 +340,10 @@ export default function WelcomeApp() {
               <div className="tray-v5-hint">
                 <span>Find</span>
                 <span className="tray-v5-hint-icon">
-                  <svg viewBox="230 180 220 220" width={12} height={9} aria-hidden="true">
-                    <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round" />
-                    <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" />
+                  <svg viewBox="212 168 238 232" width={14} height={10} aria-hidden="true" style={{display:'inline',verticalAlign:'middle'}}>
+                    <path d="M233 182C307 181 389 198 420 248" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round" />
+                    <path d="M262 374C252 373 240 371 225 367" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" />
+                    <path d="M234 257C288 237 349 232 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" />
                   </svg>
                 </span>
                 <span>in your menu bar.</span>

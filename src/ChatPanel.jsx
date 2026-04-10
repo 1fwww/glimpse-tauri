@@ -191,7 +191,12 @@ export default function ChatPanel({
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 100)
     // Retry focus when window gains focus (handles terminal stealing focus)
-    const handleFocus = () => setTimeout(() => inputRef.current?.focus(), 50)
+    // Also close menus — chat may have been hidden with menu open
+    const handleFocus = () => {
+      setThreadMenuOpen(false)
+      setModelMenuOpen(false)
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [currentThread?.id])

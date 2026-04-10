@@ -46,10 +46,44 @@ pkill -f "[Gg]limpse"; lsof -ti:5173 | xargs kill -9
 ### Window Lifecycle
 - **Overlay**: Pre-warmed at startup. On close: hide (for reuse) → 300ms later destroy + prewarm fresh (for fullscreen Space association).
 - **Home**: Created on app launch, closed during screenshot/chat. `create_home_window` restores Regular activation policy.
-- **Chat**: Created on demand. `CHAT_READY` atomic flag signals frontend loaded.
+- **Chat**: Pre-warmed at startup (hidden, offscreen). On Cmd+Shift+X: show pre-warmed (instant). On close: hide (not destroy) for reuse. `CHAT_READY` atomic flag signals frontend loaded.
 - **Toast**: Temp HTML file, auto-closes after 1.8s.
 
 ## Corner Cases & Hard-Won Lessons
+
+### Chat Window Space Management (Multi-Desktop + Fullscreen)
+**User experience**: Cmd+Shift+X opens chat on current desktop. Chat stays on that desktop when user switches away. Works on fullscreen Spaces too.
+
+**How it works**: Two paths based on `CGSSpaceGetType`:
+
+**Non-fullscreen (fast path)**:
+1. Pre-warmed chat exists (hidden)
+2. Set `CanJoinAllSpaces | FullScreenAuxiliary` → show → order_front
+3. 200ms later: switch to `FullScreenAuxiliary` only (`set_single_space`) → window stays on current Space, disappears from others
+
+**Fullscreen (slow path)**:
+1. `CGSSpaceGetType(activeSpace) == 4` → fullscreen detected
+2. Destroy pre-warmed chat (hidden window can't be moved to fullscreen Space)
+3. Create fresh chat window → automatically associated with current fullscreen Space
+4. Set `CanJoinAllSpaces | FullScreenAuxiliary` + floating level
+5. 300ms later: `set_single_space`
+
+**What breaks it / failed approaches**:
+- `MoveToActiveSpace` — works for normal desktops but **incompatible with fullscreen Spaces**. Window gets kicked off fullscreen when this is set.
+- `CanJoinAllSpaces` without `set_single_space` cleanup — window appears on ALL desktops simultaneously.
+- `CanJoinAllSpaces` → show → immediately switch to `MoveToActiveSpace` — kicks window off fullscreen Space.
+- `activate_app()` in Accessory mode — causes Space switch (teleports user to another desktop). Use `order_front` + floating level instead.
+- Showing pre-warmed hidden window on fullscreen Space — **does not work** regardless of collection behavior. macOS binds hidden windows to their original Space. Only fresh windows get the current Space.
+- Detecting fullscreen via menu bar height, `AXFullScreen` attribute, or cursor position — all unreliable. `CGSSpaceGetType` (private API) is the only reliable method.
+- Setting Accessory policy in `handle_chat_shortcut` unconditionally — also triggers on non-fullscreen (whenever no visible windows), causing pre-warmed chat to be unnecessarily destroyed.
+
+**Key APIs**:
+- `CGSMainConnectionID()` + `CGSGetActiveSpace()` + `CGSSpaceGetType()` — private CGS APIs for Space detection. Type 0 = normal, Type 4 = fullscreen.
+- `set_visible_on_fullscreen` = `CanJoinAllSpaces (1<<0) | FullScreenAuxiliary (1<<8)` = 257
+- `set_single_space` = `FullScreenAuxiliary (1<<8)` only = 256
+- `set_move_to_active_space` = `MoveToActiveSpace (1<<1) | FullScreenAuxiliary (1<<8)` = 258 — **do NOT use with fullscreen**
+
+**Long-term optimization**: Replace NSWindow with NSPanel (`.nonactivatingPanel`) for chat. NSPanel natively floats on fullscreen Spaces without Accessory policy, eliminating the need for destroy+recreate, CGS private APIs, and collection behavior gymnastics. Raycast, Alfred, and Arc all use NSPanel for this reason.
 
 ### Fullscreen Space Support
 **User experience**: User is in a fullscreen app (e.g., Safari), presses Cmd+Shift+Z. Overlay must appear ON TOP of the fullscreen app, not on another desktop.

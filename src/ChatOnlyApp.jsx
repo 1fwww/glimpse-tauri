@@ -11,6 +11,7 @@ export default function ChatOnlyApp() {
 
   useEffect(() => {
     window.electronAPI?.onTextContext?.((text) => setInitialContext(prev => ({ text: text?.trim() || '', seq: prev.seq + 1 })))
+    window.electronAPI?.onClearTextContext?.(() => setInitialContext({ text: '', seq: 0 }))
     window.electronAPI?.onPinState?.((state) => setIsPinned(state))
     window.electronAPI?.onSetCroppedImage?.((img) => setCroppedImage(img))
     window.electronAPI?.onClearScreenshot?.(() => setCroppedImage(null))
