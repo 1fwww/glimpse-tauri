@@ -96,10 +96,70 @@ window.electronAPI?.resizeChatWindow?.({
 
 ---
 
-## Priority
+## Bug 6: User message triggers existing-chat expand logic
 
-1. **Bug 1** (NaN) — This breaks all existing chat sizing. Fix first.
-2. **Bug 3** (140px fallback) — Causes tiny window on fullscreen Spaces.
-3. **Bug 2** (quote height) — Causes clipping with text quotes.
-4. **Bug 5** (chatFullSize not reset) — Prevents compact→expand cycle on new chats.
-5. **Bug 4** (scroll visual) — Lower priority, cosmetic.
+**File:** `ChatPanel.jsx` ~line 220-233
+**Problem:** The "existing chat sizing" useEffect triggers on `messages.length > 0`. When user sends a NEW message in a new chat, `messages.length` goes from 0 to 1 → useEffect fires → `setChatFullSize(true)` + `resizeChatWindow(EXPANDED_MAX)`. The panel expands to full size the moment user sends, before AI responds.
+
+This useEffect was meant for "opening a chat that already has messages", NOT for "a message was just added to a new chat."
+
+**Fix:** Track whether this is an initial load vs a live session. Only resize on initial load:
+
+```javascript
+const isInitialLoad = useRef(true)
+
+useEffect(() => {
+  // Only auto-size on initial load (opening existing chat), not on new messages
+  if (messages.length > 0 && !initialSizeSet.current && isInitialLoad.current && messagesContainerRef.current) {
+    initialSizeSet.current = true
+    const contentH = messagesContainerRef.current.scrollHeight
+    const chromeH = CHAT_SIZES.CHROME_FIXED
+    const targetH = Math.min(contentH + chromeH, CHAT_SIZES.EXPANDED_MAX)
+    window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: targetH, force: true })
+    setChatFullSize(true)
+  }
+  if (messages.length === 0) {
+    initialSizeSet.current = false
+    isInitialLoad.current = false  // from now on, messages are live additions
+  }
+}, [messages.length > 0])
+
+// When user sends a message, mark as no longer initial load
+// (Add this to the send handler, before setMessages):
+isInitialLoad.current = false
+```
+
+Alternatively, simpler: check if messages were loaded from a thread (have `createdAt` timestamps) vs just added live. But the ref approach is more reliable.
+
+---
+
+## Bug 7: Header/bottom bar must NEVER be clipped — enforce at OS level
+
+**Problem:** The spec says "Nothing gets clipped" but this is only enforced as a JS constant (`MIN_HEIGHT: 260`). If the window is somehow smaller (e.g. restored from a saved state, or `force: true` with wrong value), header and bottom bar will be squished.
+
+**Fix:** Add native minimum size constraints in Rust. This is the only way to guarantee it:
+
+```rust
+// windows.rs — prewarm_chat (line 151):
+.min_inner_size(360.0, 260.0)
+
+// windows.rs — create_chat_window fresh path (line 262):  
+.min_inner_size(360.0, 260.0)
+
+// windows.rs — pin_chat slow path (line 670):
+.min_inner_size(360.0, 260.0)
+```
+
+This makes macOS prevent the window from being resized below 360×260 at the OS level. No CSS or JS workaround needed.
+
+---
+
+## Priority (updated)
+
+1. **Bug 6** (P0) — User message causes premature expand. Most visible issue.
+2. **Bug 1** (P0) — NaN breaks existing chat sizing.
+3. **Bug 7** (P0) — Add `min_inner_size` everywhere to prevent clipping.
+4. **Bug 3** (P0) — 140px fresh window fallback.
+5. **Bug 2** (P1) — Quote compact height too small.
+6. **Bug 5** (P1) — chatFullSize not reset on new thread.
+7. **Bug 4** (P2) — Scroll visual on send (cosmetic).
