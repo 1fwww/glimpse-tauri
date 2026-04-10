@@ -150,7 +150,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("[Chat] Pre-warming chat webview...");
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
-        .inner_size(432.0, 280.0)
+        .inner_size(432.0, 320.0)
         .min_inner_size(360.0, 260.0)
         .position(-9999.0, -9999.0) // offscreen but visible (WebKit needs visible to run JS)
         .resizable(true)
@@ -177,7 +177,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn create_chat_window(app: &AppHandle, height_hint: Option<f64>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // On fullscreen Space, pre-warmed window can't be moved there — must create fresh
     if crate::native_mac::is_fullscreen_space() {
         eprintln!("[Chat] fullscreen Space detected, destroying pre-warmed chat");
@@ -194,9 +194,8 @@ pub fn create_chat_window(app: &AppHandle, height_hint: Option<f64>) -> Result<(
         // Chat exists (pre-warmed or hidden) — reposition to cursor's monitor, then show
         let is_hidden = !w.is_visible().unwrap_or(true);
         if is_hidden {
-            // Reset to appropriate size for fresh open
-            let h = height_hint.unwrap_or(280.0);
-            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 432.0, height: h }));
+            // Reset to a size that fits all scenarios (empty, quote, screenshot)
+            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 432.0, height: 412.0 }));
             // Find monitor at cursor position
             let cursor = core_graphics::event_source::CGEventSource::new(
                 core_graphics::event_source::CGEventSourceStateID::CombinedSessionState,
@@ -226,7 +225,7 @@ pub fn create_chat_window(app: &AppHandle, height_hint: Option<f64>) -> Result<(
                 let sw = m.size().width as f64 / s;
                 let sh = m.size().height as f64 / s;
                 // Get actual window size (may have been resized)
-                let (ww, wh) = w.outer_size().map(|s| (s.width as f64 / w.scale_factor().unwrap_or(1.0), s.height as f64 / w.scale_factor().unwrap_or(1.0))).unwrap_or((432.0, 280.0));
+                let (ww, wh) = w.outer_size().map(|s| (s.width as f64 / w.scale_factor().unwrap_or(1.0), s.height as f64 / w.scale_factor().unwrap_or(1.0))).unwrap_or((432.0, 320.0));
                 // Center on monitor, clamped to screen bounds
                 let x = (mx + (sw - ww) / 2.0).max(mx).min(mx + sw - ww);
                 let y = (my + (sh - wh) / 2.0).max(my).min(my + sh - wh);
@@ -260,7 +259,7 @@ pub fn create_chat_window(app: &AppHandle, height_hint: Option<f64>) -> Result<(
         });
         return Ok(());
     }
-    let fresh_h = height_hint.unwrap_or(280.0);
+    let fresh_h = 320.0;
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
         .inner_size(432.0, fresh_h)  // +12 for 6px padding each side

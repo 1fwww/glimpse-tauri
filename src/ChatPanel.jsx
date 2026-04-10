@@ -4,34 +4,6 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import ApiKeySetup from './ApiKeySetup'
 
-export const CHAT_SIZES = {
-  // ─── Compact heights (based on measured chrome) ───
-  COMPACT_EMPTY: 280,       // 183 fixed + 80 messages min + 17 breathing
-  COMPACT_QUOTE: 320,       // 183 chrome + 80 messages min + 37 snippet + 20 safety
-  COMPACT_SCREENSHOT: 300,  // + 38px attachment cue in input area
-  COMPACT_BOTH: 340,        // + both attachments
-
-  // ─── Expanded ───
-  EXPANDED_DEFAULT: 480,    // standard reading height after AI reply
-  EXPANDED_MAX: 600,        // absolute max before content scrolls
-
-  // ─── Hard limits ───
-  MIN_HEIGHT: 260,          // absolute floor — NEVER below this
-  MIN_WIDTH: 360,           // text wrapping breaks below this
-  MAX_WIDTH: 700,
-  MAX_HEIGHT_RATIO: 0.65,   // never taller than 65% of screen
-
-  // ─── Width ───
-  COMPACT_WIDTH: 380,
-  EXPANDED_WIDTH: 420,
-
-  // ─── Measured chrome (for dynamic calculations) ───
-  CHROME_FIXED: 183,        // header + input(empty) + actions + window padding
-  MESSAGES_MIN: 80,         // min-height of messages area
-  SNIPPET_EXTRA: 37,        // added to input area when text quote present
-  ATTACHMENT_EXTRA: 38,     // added to input area when screenshot present
-}
-
 const BROW_RESTING = "M98 212C152 174 365 158 420 248"
 const BROW_FOCUSED = "M98 192C200 192 350 204 420 234"
 
@@ -153,12 +125,6 @@ export default function ChatPanel({
     if (initialContext?.text) setTextContext(initialContext.text)
   }, [initialContext?.seq])
 
-  // When text context appears, ensure window is at quote-appropriate size (fallback if Rust didn't get the hint)
-  useEffect(() => {
-    if (textContext && messages.length === 0) {
-      window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: CHAT_SIZES.COMPACT_QUOTE })
-    }
-  }, [textContext])
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState([])
   const [screenshotAttached, setScreenshotAttached] = useState(true)
@@ -180,8 +146,7 @@ export default function ChatPanel({
 
     // Skip reload when a new thread just gets its first ID (preserve in-session images)
     if (!isNewThreadGettingId) {
-      isInitialLoad.current = true  // loading from thread = initial load (allow auto-resize)
-      if (currentThread?.messages?.length > 0) {
+            if (currentThread?.messages?.length > 0) {
         setMessages(currentThread.messages.map(m => {
           if (m.role === 'assistant') {
             return { role: 'assistant', text: (m.content || []).map(c => c.text || '').join(''), model: m.model }
@@ -215,26 +180,6 @@ export default function ChatPanel({
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
     }, 50)
   }, [currentThread?.id])
-
-  // Existing chat with messages: resize to content-appropriate size immediately (no animation)
-  // Only triggers on initial load (opening existing chat), NOT on new messages sent in a live session
-  const initialSizeSet = useRef(false)
-  const isInitialLoad = useRef(true)
-  useEffect(() => {
-    if (messages.length > 0 && !initialSizeSet.current && isInitialLoad.current && messagesContainerRef.current) {
-      initialSizeSet.current = true
-      const contentH = messagesContainerRef.current.scrollHeight
-      const chromeH = CHAT_SIZES.CHROME_FIXED
-      const targetH = Math.min(contentH + chromeH, CHAT_SIZES.EXPANDED_MAX)
-      window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: targetH, force: true })
-      setChatFullSize(true)
-    }
-    // Reset flags when thread changes to allow re-sizing
-    if (messages.length === 0) {
-      initialSizeSet.current = false
-      isInitialLoad.current = false  // from now on, messages are live additions
-    }
-  }, [messages.length > 0])
 
   // Auto-focus input
   useEffect(() => {
@@ -302,7 +247,7 @@ export default function ChatPanel({
   useEffect(() => {
     if (showApiKeySetup) {
       if (!chatFullSize) setChatFullSize(true)
-      window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: 520 })
+      window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
       window.electronAPI?.lowerOverlay?.()
     } else {
       window.electronAPI?.restoreOverlay?.()
@@ -362,14 +307,9 @@ export default function ChatPanel({
             const assistantText = result.content.map(c => c.text || '').join('')
             const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
             apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
-            // Expand panel BEFORE adding content
-            if (!chatFullSize) {
-              setChatFullSize(true)
-              const screenH = window.innerHeight
-              const targetH = Math.min(CHAT_SIZES.EXPANDED_DEFAULT, screenH * CHAT_SIZES.MAX_HEIGHT_RATIO)
-              window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: targetH })
-            }
-            await new Promise(r => setTimeout(r, 50))
+            // Expand panel for AI response
+            if (!chatFullSize) setChatFullSize(true)
+            window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
             setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
             setTimeout(() => scrollToLastAssistant(), 350)
 
@@ -541,7 +481,6 @@ export default function ChatPanel({
       image: willAttachImage ? imageForChat : null,
       snippet: sentSnippet,
     }
-    isInitialLoad.current = false  // mark as live session — prevent existing-chat resize logic
     setMessages(prev => [...prev, uiMsg])
     setIsLoading(true)
 
@@ -567,13 +506,8 @@ export default function ChatPanel({
         const assistantApiMsg = { role: 'assistant', content: result.content, model: currentModelName }
         apiMessages.current.push(assistantApiMsg)
         // Expand panel BEFORE adding content so panel grows while content fades in
-        if (!chatFullSize) {
-          setChatFullSize(true)
-          const screenH = window.innerHeight
-          const targetH = Math.min(CHAT_SIZES.EXPANDED_DEFAULT, screenH * CHAT_SIZES.MAX_HEIGHT_RATIO)
-          window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.EXPANDED_WIDTH, height: targetH })
-        }
-        // Small delay so expansion starts before content appears
+        if (!chatFullSize) setChatFullSize(true)
+        window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
         await new Promise(r => setTimeout(r, 50))
         setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
 
@@ -808,7 +742,7 @@ export default function ChatPanel({
           <button
             className={`chat-header-new`}
             onClick={(e) => {
-              onNewThread(); setChatFullSize(false); window.electronAPI?.resizeChatWindow?.({ width: CHAT_SIZES.COMPACT_WIDTH, height: CHAT_SIZES.COMPACT_EMPTY, force: true }); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim()
+              onNewThread(); setEyeAnim('draw'); setTimeout(() => setEyeAnim(''), 850); triggerTitleAnim()
               const btn = e.currentTarget; btn.classList.add('press'); setTimeout(() => btn.classList.remove('press'), 150)
             }}
             aria-label="New chat"

@@ -186,7 +186,7 @@ pub fn run() {
                                 if let Some(thread) = threads.get(idx) {
                                     let thread_data = thread.clone();
                                     let app_thread = app_tray.clone();
-                                    let _ = windows::create_chat_window(&app_tray, None);
+                                    let _ = windows::create_chat_window(&app_tray);
                                     // Delay emit to ensure chat window is ready
                                     std::thread::spawn(move || {
                                         // Wait for CHAT_READY
@@ -227,7 +227,7 @@ pub fn run() {
                     if !has_visible {
                         let data_dir = get_data_dir();
                         if data_dir.join("onboarding-done").exists() {
-                            let _ = windows::create_chat_window(app, None);
+                            let _ = windows::create_chat_window(app);
                         } else {
                             let _ = windows::create_welcome_window(app);
                         }
@@ -481,8 +481,7 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         }
         // Now show chat (instant if pre-warmed)
         let has_context = !selected_text.is_empty();
-        let height_hint = if has_context { Some(320.0) } else { None };
-        let _ = windows::create_chat_window(&app_clone, height_hint);
+        let _ = windows::create_chat_window(&app_clone);
         if let Some(w) = app_clone.get_webview_window("chat") {
             if has_context {
                 let _ = w.emit("text-context", &selected_text);
