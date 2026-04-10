@@ -8,11 +8,12 @@
 
 ## Rules
 
-1. **Bottom-anchored expansion** — Input box position NEVER moves during expansion. Panel grows upward only.
-2. **No empty space** — Initial height is determined by content, not a fixed number. No large blank areas.
-3. **Content justifies size** — Panel is only as big as its content requires + comfortable padding.
-4. **Smooth, single-direction** — All size changes animate upward with ease-out. Never shrink during a conversation.
-5. **Instant for existing content** — When opening a chat that already has messages, skip animation — show at correct size immediately.
+1. **Nothing gets clipped** — Header, input, thread actions bar must ALWAYS be fully visible. No truncation, ever.
+2. **Bottom-anchored expansion** — Input box position NEVER moves during expansion. Panel grows upward only.
+3. **Stay on screen** — Window must never extend above screen top or below screen bottom. Check bounds before AND after expansion.
+4. **Content justifies size** — Panel is only as big as its content requires + comfortable padding.
+5. **Smooth, single-direction** — All size changes animate upward with ease-out. Never shrink during a conversation (except on new chat).
+6. **Instant for existing content** — When opening a chat that already has messages, skip animation — show at correct size immediately.
 
 ---
 
@@ -20,13 +21,16 @@
 
 ### A. New Chat — Empty (no attachment, no quote)
 
-**Initial height: ~140px**
-- Header: 48px
-- Input area: 52px (textarea + padding)
-- Breathing room: 40px
-- Total: ~140px
+**Initial height: 280px**
+- Header: 53px
+- Messages area (min): 80px
+- Input area (empty): 84px
+- Thread actions bar: 34px
+- Window chrome: 12px
+- Breathing room: 17px
+- Total: 280px
 
-The panel is barely more than a search bar. Maximum lightness.
+Compact but everything visible — header, input, model selector all fully rendered. No clipping.
 
 **Expansion trigger:** AI response arrives. Currently there is NO streaming — `chatWithAI` returns the full response in one shot (`ChatPanel.jsx:303`). Expansion happens when `result.success` is true (`ChatPanel.jsx:317-318`). Keep this trigger but:
 - Start expansion BEFORE setting messages (so panel grows while content fades in)
@@ -40,9 +44,9 @@ The panel is barely more than a search bar. Maximum lightness.
 
 ### B. New Chat — With Text Quote (Cmd+Shift+X)
 
-**Initial height: ~200px**
-- Same as empty + snippet preview (~60px)
-- Total: ~200px
+**Initial height: 300px**
+- Same as empty but input area grows from 84→121px (+37px snippet)
+- Total: 280 + 37 ≈ 300px (rounded for safety)
 
 **CRITICAL — the "突然变长" bug:**
 
@@ -73,7 +77,7 @@ let _ = windows::create_chat_window(&app_clone, has_context);
 pub fn create_chat_window(app: &AppHandle, has_context: bool) -> Result<(), ...> {
     // ...
     // line 197 — change:
-    let h = if has_context { 480.0 } else { 320.0 };  // TODO: use CHAT_SIZES constants
+    let h = if has_context { 300.0 } else { 280.0 };  // COMPACT_QUOTE vs COMPACT_EMPTY
     let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 432.0, height: h }));
 ```
 
@@ -99,9 +103,9 @@ And `prewarm_chat` (`windows.rs:146`) stays at the compact size since it's just 
 
 ### C. New Chat — With Screenshot (overlay mode)
 
-**Initial height: ~160px**
-- Same as empty + "Screenshot attached" bar (~20px)
-- Total: ~160px
+**Initial height: 300px**
+- Same as empty but input area grows from 84→122px (+38px attachment cue)
+- Total: 280 + 38 ≈ 300px
 
 In overlay mode this is CSS-driven (not native window resize). The chat panel is positioned via `getChatPosition()` in `App.jsx:537-572`. Change:
 
@@ -109,7 +113,7 @@ In overlay mode this is CSS-driven (not native window resize). The chat panel is
 // App.jsx line 543 — change:
 const compactHeight = 320
 // to:
-const compactHeight = screenshotAttached ? 160 : 140
+const compactHeight = screenshotAttached ? 300 : 280
 ```
 
 The `maxHeight` style on `.chat-panel` starts at this compact value, then transitions to expanded on AI reply via the existing CSS `max-height` transition.
@@ -142,33 +146,54 @@ useEffect(() => {
 
 ## Height Constants
 
-Replace scattered magic numbers with a single source of truth:
+Replace scattered magic numbers with a single source of truth.
+
+**IMPORTANT:** These values are based on actual rendered measurements, not estimates. If any CSS changes to header, input, or thread-actions, these must be re-verified.
+
+### Actual rendered chrome breakdown
+
+| Element | Height | Source |
+|---------|--------|--------|
+| Window chrome (top) | 6px | `.chat-only-app` padding |
+| Header | 53px | 12px pad + 28px content + 12px pad + 1px border |
+| Input area (empty) | 84px | 1px border + 12px pad + ~58px textarea + 12px pad |
+| Input area (+ quote) | 121px | + 37px snippet |
+| Input area (+ screenshot) | 122px | + 38px attachment cue |
+| Input area (+ both) | 160px | + both |
+| Thread actions bar | 34px | 8px pad + 14px content + 12px pad |
+| Window chrome (bottom) | 6px | `.chat-only-app` padding |
+| **Fixed chrome total** | **183px** | header + input + actions + window padding |
+| Messages area min-height | 80px | `.chat-messages-wrapper` min-height |
+
+### Constants
 
 ```javascript
 const CHAT_SIZES = {
-  // Initial compact heights (by content type)
-  COMPACT_EMPTY: 140,       // header + input + padding
-  COMPACT_QUOTE: 200,       // + snippet preview
-  COMPACT_SCREENSHOT: 160,  // + attachment bar
+  // ─── Compact heights (based on measured chrome) ───
+  COMPACT_EMPTY: 280,       // 183 fixed + 80 messages min + 17 breathing
+  COMPACT_QUOTE: 300,       // + 37px snippet in input area
+  COMPACT_SCREENSHOT: 300,  // + 38px attachment cue in input area
+  COMPACT_BOTH: 340,        // + both attachments
   
-  // Expanded
-  EXPANDED_DEFAULT: 480,    // standard reading height
-  EXPANDED_MAX: 550,        // absolute max before scrolling
+  // ─── Expanded ───
+  EXPANDED_DEFAULT: 480,    // standard reading height after AI reply
+  EXPANDED_MAX: 600,        // absolute max before content scrolls
   
-  // Constraints
-  MIN_HEIGHT: 120,          // never smaller than this
-  MAX_HEIGHT_RATIO: 0.7,    // never taller than 70% of screen
+  // ─── Hard limits ───
+  MIN_HEIGHT: 260,          // absolute floor — NEVER below this
+  MIN_WIDTH: 360,           // text wrapping breaks below this
+  MAX_WIDTH: 700,
+  MAX_HEIGHT_RATIO: 0.65,   // never taller than 65% of screen
   
-  // Width
+  // ─── Width ───
   COMPACT_WIDTH: 380,
   EXPANDED_WIDTH: 420,
   
-  // Chrome (non-content areas)
-  HEADER_HEIGHT: 48,
-  INPUT_HEIGHT: 52,
-  PADDING: 40,
-  SNIPPET_HEIGHT: 60,
-  ATTACHMENT_HEIGHT: 20,
+  // ─── Measured chrome (for dynamic calculations) ───
+  CHROME_FIXED: 183,        // header + input(empty) + actions + window padding
+  MESSAGES_MIN: 80,         // min-height of messages area
+  SNIPPET_EXTRA: 37,        // added to input area when text quote present
+  ATTACHMENT_EXTRA: 38,     // added to input area when screenshot present
 }
 ```
 
@@ -321,6 +346,57 @@ function getCompactHeight() {
 
 ---
 
+## Edge Cases
+
+### Expand would go above screen top
+
+```
+Before expanding, check:
+  newY = currentY - growAmount
+  if (newY < screenTop + margin) {
+    Option A (preferred): cap expand height
+      maxGrow = currentY - screenTop - margin
+      targetH = min(targetH, currentH + maxGrow)
+    Option B: move window down first, then expand
+      y = screenTop + margin
+      then expand to full targetH
+  }
+```
+
+### Window bottom below screen
+
+On initial positioning AND after any resize, clamp:
+```
+if (windowY + windowH > screenBottom - margin) {
+  windowY = screenBottom - margin - windowH
+}
+```
+The existing `resize_chat_window` has monitor bounds clamping — make sure it also applies to initial `set_position` in `create_chat_window`.
+
+### Small screens (MacBook Air 13", ~800px)
+
+- `MAX_HEIGHT_RATIO: 0.65` → max 520px on 800px screen — enough for expanded
+- Compact 280px = 35% of screen — reasonable
+- If screen height < 600px (external display edge case), use `MIN_HEIGHT: 260px` as floor
+
+### New chat after existing chat
+
+When user clicks "New Chat" or starts a new thread:
+- Force shrink to `COMPACT_EMPTY` (280px): `resizeChatWindow({ height: 280, force: true })`
+- This is the ONE case where the window shrinks during the session
+- Animate the shrink (same 350ms ease-out, but downward)
+
+### User manually resized, then AI replies
+
+If user dragged the window larger, respect their choice:
+- Track `userHasResized` flag (set on manual resize, clear on new chat)
+- If `userHasResized`, do NOT auto-expand on AI reply — user already set their preferred size
+- If not resized, auto-expand normally
+
+### Quote + screenshot at same time
+
+Both attachments present: use `COMPACT_BOTH: 340px`. Input area grows to ~160px (both inline).
+
 ## Implementation Priority
 
 1. **P0: Fix quote jump** — See Scenario B above. Changes in:
@@ -331,9 +407,9 @@ function getCompactHeight() {
    - `ChatPanel.jsx:129-132` — keep as fallback, no longer primary resize path
 
 2. **P1: Reduce initial compact height** — Changes in:
-   - `windows.rs:153` — prewarm at compact height (140) instead of 320
-   - `windows.rs:197` — reset to compact height instead of 320
-   - `App.jsx:543` — `compactHeight = 140` (was 320), or content-aware via `getCompactHeight()`
+   - `windows.rs:153` — prewarm at 280px (was 320)
+   - `windows.rs:197` — reset to 280px (was 320)
+   - `App.jsx:543` — `compactHeight = 280` (was 320), or content-aware via `getCompactHeight()`
    - New: `CHAT_SIZES` constants object in a shared location (e.g. `src/constants.js`)
 
 3. **P1: Bottom-anchored expansion** — Changes in:
