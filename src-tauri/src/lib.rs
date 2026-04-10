@@ -77,6 +77,7 @@ pub fn run() {
             // Permissions
             commands::permissions::check_permissions,
             commands::permissions::request_screen_permission,
+            commands::permissions::request_accessibility_permission,
             commands::permissions::open_permission_settings,
             // Window management
             windows::close_home,

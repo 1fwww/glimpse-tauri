@@ -194,7 +194,10 @@ export default function WelcomeApp() {
                 {permissions.accessibility ? (
                   <svg className="perm-check check-draw check-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
                 ) : (
-                  <button className="perm-grant" onClick={() => window.electronAPI?.openPermissionSettings('accessibility')}>Grant</button>
+                  <button className="perm-grant" onClick={async () => {
+                    const result = await window.electronAPI?.requestAccessibilityPermission()
+                    if (result?.granted) checkPermissions()
+                  }}>Grant</button>
                 )}
               </div>
             </div>

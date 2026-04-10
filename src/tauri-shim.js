@@ -78,6 +78,7 @@ if (window.__TAURI_INTERNALS__ && !window.electronAPI) {
     // ── Permissions ──
     checkPermissions: () => invoke('check_permissions'),
     requestScreenPermission: () => invoke('request_screen_permission'),
+    requestAccessibilityPermission: () => invoke('request_accessibility_permission'),
     openPermissionSettings: (type) => invoke('open_permission_settings', { type }),
 
     // ── Utilities ──
