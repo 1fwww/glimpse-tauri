@@ -393,7 +393,9 @@ export default function App() {
       if (w < 20) { w = 20; if (moveLeft) x = s.x + s.w - 20 }
       if (h < 20) { h = 20; if (moveTop) y = s.y + s.h - 20 }
 
-      setSelection({ x, y, w, h })
+      const sel = { x, y, w, h }
+      selectionRef.current = sel
+      updateSelectionDOM(sel)
       return
     }
 
@@ -402,12 +404,14 @@ export default function App() {
       const dx = e.clientX - moveStart.current.x
       const dy = e.clientY - moveStart.current.y
       const s = moveStart.current.sel
-      setSelection({
+      const sel = {
         x: Math.max(0, Math.min(s.x + dx, window.innerWidth - s.w)),
         y: Math.max(0, Math.min(s.y + dy, window.innerHeight - s.h)),
         w: s.w,
         h: s.h,
-      })
+      }
+      selectionRef.current = sel
+      updateSelectionDOM(sel)
       return
     }
 
@@ -460,7 +464,12 @@ export default function App() {
       resizeEdge.current = null
       moveStart.current = null
       document.body.style.cursor = ''
-      if (selection) cropSelection(selection, screenImage)
+      const finalSel = selectionRef.current || selection
+      if (selectionRef.current) {
+        setSelection(selectionRef.current)
+        selectionRef.current = null
+      }
+      if (finalSel) cropSelection(finalSel, screenImage)
       return
     }
 
@@ -469,7 +478,12 @@ export default function App() {
       setIsMovingSelection(false)
       moveStart.current = null
       document.body.style.cursor = ''
-      if (selection) cropSelection(selection, screenImage)
+      const finalSel = selectionRef.current || selection
+      if (selectionRef.current) {
+        setSelection(selectionRef.current)
+        selectionRef.current = null
+      }
+      if (finalSel) cropSelection(finalSel, screenImage)
       return
     }
 
