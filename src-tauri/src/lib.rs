@@ -426,6 +426,7 @@ fn handle_screenshot_shortcut(app: &tauri::AppHandle) {
 }
 
 fn handle_chat_shortcut(app: &tauri::AppHandle) {
+    eprintln!("[Chat] shortcut triggered, IS_ACCESSORY={}", IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst));
     // If welcome window is open, notify it
     if let Some(w) = app.get_webview_window("welcome") {
         let _ = w.emit("shortcut-tried", "chat");
@@ -450,7 +451,8 @@ fn handle_chat_shortcut(app: &tauri::AppHandle) {
         && !app.get_webview_window("chat").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
         && !app.get_webview_window("overlay").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
     if needs_policy && !IS_ACCESSORY.load(std::sync::atomic::Ordering::SeqCst) {
-        if let Some(ow) = app.get_webview_window("overlay") {
+        if let Some(ow) = app.get_webview_window("overlay")
+            .or_else(|| app.get_webview_window("chat")) {
             let app2 = app.clone();
             let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let done2 = done.clone();
@@ -502,17 +504,19 @@ fn grab_selected_text() -> String {
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
 
-    // Clear clipboard
+    // Clear clipboard with a unique sentinel to detect "no new copy"
+    let sentinel = format!("__glimpse_sentinel_{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos());
     let _ = Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn()
         .and_then(|mut c| {
             use std::io::Write;
             if let Some(stdin) = c.stdin.as_mut() {
-                stdin.write_all(b"")?;
+                stdin.write_all(sentinel.as_bytes())?;
             }
             c.wait()
         });
 
-    // Small delay to ensure clipboard is cleared before Cmd+C
+    // Small delay to ensure clipboard is set before Cmd+C
     std::thread::sleep(std::time::Duration::from_millis(20));
 
     // Simulate Cmd+C
@@ -520,13 +524,13 @@ fn grab_selected_text() -> String {
         .args(["-e", r#"tell application "System Events" to keystroke "c" using command down"#])
         .output();
 
-    // Poll clipboard — fast initial checks, bail early
+    // Poll clipboard — check for new content (not sentinel)
     let mut selected = String::new();
     for _ in 0..10 {
         std::thread::sleep(std::time::Duration::from_millis(25));
         if let Ok(output) = Command::new("pbpaste").output() {
             let text = String::from_utf8_lossy(&output.stdout).to_string();
-            if !text.is_empty() {
+            if !text.is_empty() && text != sentinel {
                 selected = text;
                 break;
             }

@@ -27,6 +27,33 @@ unsafe fn set_subviews_transparent(
     }
 }
 
+/// Move window to the active Space when shown (for chat window).
+/// Uses MoveToActiveSpace + FullScreenAuxiliary (NOT CanJoinAllSpaces — they're incompatible).
+pub fn set_move_to_active_space(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyObject;
+        use objc2::msg_send;
+
+        let ns_window = match window.ns_window() {
+            Ok(ptr) => ptr,
+            Err(e) => {
+                eprintln!("[native_mac] ns_window() failed: {}", e);
+                return;
+            }
+        };
+
+        unsafe {
+            let win = ns_window as *mut AnyObject;
+            // MoveToActiveSpace (1 << 1) | FullScreenAuxiliary (1 << 8)
+            let behavior: u64 = (1 << 1) | (1 << 8);
+            let _: () = msg_send![&*win, setCollectionBehavior: behavior];
+            let actual: u64 = msg_send![&*win, collectionBehavior];
+            eprintln!("[native_mac] set_move_to_active_space: requested={}, actual={}", behavior, actual);
+        }
+    }
+}
+
 /// Set a window to be visible on all workspaces including fullscreen Spaces.
 pub fn set_visible_on_fullscreen(window: &tauri::WebviewWindow, visible: bool) {
     #[cfg(target_os = "macos")]

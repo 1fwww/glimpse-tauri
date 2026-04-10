@@ -150,7 +150,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("[Chat] Pre-warming chat webview...");
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
-        .inner_size(432.0, 412.0)
+        .inner_size(432.0, 320.0)
         .position(-9999.0, -9999.0) // offscreen but visible (WebKit needs visible to run JS)
         .resizable(true)
         .decorations(false)
@@ -161,6 +161,7 @@ pub fn prewarm_chat(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let _ = win.run_on_main_thread(move || {
         crate::native_mac::set_transparent_background(&w);
         crate::native_mac::set_window_shadow(&w, false);
+        crate::native_mac::set_visible_on_fullscreen(&w, true);
     });
     // Wait for React to init (may take a few seconds for WebView to load)
     CHAT_READY.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -181,6 +182,8 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         // Chat exists (pre-warmed or hidden) — reposition to cursor's monitor, then show
         let is_hidden = !w.is_visible().unwrap_or(true);
         if is_hidden {
+            // Reset to compact size for fresh open (frontend will resize if needed)
+            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 432.0, height: 320.0 }));
             // Find monitor at cursor position
             let cursor = core_graphics::event_source::CGEventSource::new(
                 core_graphics::event_source::CGEventSourceStateID::CombinedSessionState,
@@ -209,19 +212,21 @@ pub fn create_chat_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
                 let my = m.position().y as f64 / s;
                 let sw = m.size().width as f64 / s;
                 let sh = m.size().height as f64 / s;
-                let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                    x: mx + (sw - 432.0) / 2.0,
-                    y: my + (sh - 412.0) / 2.0,
-                }));
+                // Get actual window size (may have been resized)
+                let (ww, wh) = w.outer_size().map(|s| (s.width as f64 / w.scale_factor().unwrap_or(1.0), s.height as f64 / w.scale_factor().unwrap_or(1.0))).unwrap_or((432.0, 320.0));
+                // Center on monitor, clamped to screen bounds
+                let x = (mx + (sw - ww) / 2.0).max(mx).min(mx + sw - ww);
+                let y = (my + (sh - wh) / 2.0).max(my).min(my + sh - wh);
+                let _ = w.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
             }
         }
         let _ = w.show();
-        w.set_focus()?;
+        let _ = w.set_focus();
         return Ok(());
     }
     let win = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat-only".into()))
         .title("Glimpse Chat")
-        .inner_size(432.0, 412.0)  // +12 for 6px padding each side
+        .inner_size(432.0, 320.0)  // +12 for 6px padding each side
         .resizable(true)
         .decorations(false)
         .transparent(true)
@@ -523,7 +528,7 @@ pub fn open_thread_in_chat(app: AppHandle, thread_id: String) {
             let w = win.clone();
             let _ = win.run_on_main_thread(move || {
                 crate::native_mac::set_transparent_background(&w);
-                crate::native_mac::set_visible_on_fullscreen(&w, true);
+                crate::native_mac::set_move_to_active_space(&w);
             });
         }
     }
@@ -782,15 +787,37 @@ pub fn resize_chat_window(app: AppHandle, size: serde_json::Value) {
     if let Some(w) = app.get_webview_window("chat") {
         let new_w = size.get("width").and_then(|v| v.as_f64()).unwrap_or(420.0);
         let new_h = size.get("height").and_then(|v| v.as_f64()).unwrap_or(550.0);
-        // Only grow, never shrink (matches Electron behavior)
+        // Only grow, never shrink
         if let Ok(current) = w.outer_size() {
             let scale = w.current_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(2.0);
             let cur_w = current.width as f64 / scale;
             let cur_h = current.height as f64 / scale;
-            eprintln!("[Resize] requested={}x{}, current={}x{}, scale={}", new_w, new_h, cur_w, cur_h, scale);
             let width = new_w.max(cur_w);
             let height = new_h.max(cur_h);
-            let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+            if (height - cur_h).abs() < 1.0 && (width - cur_w).abs() < 1.0 {
+                return; // No change needed
+            }
+            // Animate using NSWindow native animation — clamp to screen bounds
+            if let Ok(pos) = w.outer_position() {
+                let mut x = pos.x as f64 / scale;
+                let mut y = pos.y as f64 / scale;
+                // Clamp to monitor bounds
+                if let Some(m) = w.current_monitor().ok().flatten() {
+                    let ms = m.scale_factor();
+                    let mx = m.position().x as f64 / ms;
+                    let my = m.position().y as f64 / ms;
+                    let mw = m.size().width as f64 / ms;
+                    let mh = m.size().height as f64 / ms;
+                    x = x.max(mx).min(mx + mw - width);
+                    y = y.max(my).min(my + mh - height);
+                }
+                let w2 = w.clone();
+                let _ = w.run_on_main_thread(move || {
+                    crate::native_mac::animate_frame(&w2, x, y, width, height);
+                });
+            } else {
+                let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+            }
         } else {
             let _ = w.set_size(tauri::Size::Logical(tauri::LogicalSize { width: new_w, height: new_h }));
         }

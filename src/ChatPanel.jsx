@@ -124,6 +124,13 @@ export default function ChatPanel({
   useEffect(() => {
     if (initialContext?.text) setTextContext(initialContext.text)
   }, [initialContext?.seq])
+
+  // When text context appears, expand window just enough for quote + input
+  useEffect(() => {
+    if (textContext && messages.length === 0) {
+      window.electronAPI?.resizeChatWindow?.({ width: 420, height: 480 })
+    }
+  }, [textContext])
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState([])
   const [screenshotAttached, setScreenshotAttached] = useState(true)
@@ -250,6 +257,7 @@ export default function ChatPanel({
 
   // After welcome animation, auto-send pending question (skip re-adding user msg)
   useEffect(() => {
+    console.log('[PendingQ] showWelcome=', showWelcome, 'pending=', pendingQuestion.current, 'providers=', availableProviders.length, 'provider=', provider, 'modelId=', modelId)
     if (!showWelcome && pendingQuestion.current && availableProviders.length === 0) {
       // Keys saved but no providers available (e.g. dev mode without env vars)
       pendingQuestion.current = null
@@ -290,7 +298,12 @@ export default function ChatPanel({
           const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
           setIsLoading(false)
           if (!result?.success) {
-            setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result?.error || 'Something went wrong'}` }])
+            if (result?.code === 'auth_error' || result?.error?.includes('No API key')) {
+              if (refreshProviders) refreshProviders()
+              setShowApiKeySetup(true)
+            } else {
+              setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result?.error || 'Something went wrong'}` }])
+            }
           } else {
             const assistantText = result.content.map(c => c.text || '').join('')
             const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
@@ -326,11 +339,28 @@ export default function ChatPanel({
           }
         } catch (err) {
           setIsLoading(false)
-          setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${err.message || 'Something went wrong'}` }])
+          const msg = typeof err === 'string' ? err : (err.message || 'Something went wrong')
+          if (msg.includes('API key') || msg.includes('api key') || msg.includes('not found')) {
+            if (refreshProviders) refreshProviders()
+            setShowApiKeySetup(true)
+          } else {
+            setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${msg}` }])
+          }
         }
       })()
     }
-  }, [showWelcome, availableProviders])
+  }, [showWelcome, availableProviders, provider, modelId])
+
+  // Connected animation completion — fade out then dismiss
+  useEffect(() => {
+    if (showWelcome) {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const timer = setTimeout(() => {
+        setShowWelcome(false)
+      }, reducedMotion ? 500 : 4500)
+      return () => clearTimeout(timer)
+    }
+  }, [showWelcome])
 
   // Track scroll position
   const handleScroll = useCallback(() => {
@@ -511,15 +541,35 @@ export default function ChatPanel({
           }
         }
       } else {
-        if (result.code === 'auth_error') {
-          setMessages(prev => [...prev, { role: 'assistant', text: 'API key missing or invalid. Please check Settings.' }])
+        if (result.code === 'auth_error' || result.error?.includes('No API key')) {
+          // Save pending state so message auto-sends after key setup
+          const lastUserMsg = apiMessages.current[apiMessages.current.length - 1]
+          if (lastUserMsg?.role === 'user') {
+            const textBlock = (lastUserMsg.content || []).find(c => c.type === 'text')
+            pendingQuestion.current = textBlock?.text || ''
+            apiMessages.current.pop()
+          }
           if (refreshProviders) refreshProviders()
+          setShowApiKeySetup(true)
         } else {
           setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result.error || 'Something went wrong'}` }])
         }
       }
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${err.message || 'Something went wrong'}` }])
+      const msg = typeof err === 'string' ? err : (err.message || 'Something went wrong')
+      if (msg.includes('API key') || msg.includes('api key') || msg.includes('not found')) {
+        // Save pending state so message auto-sends after key setup
+        const lastUserMsg = apiMessages.current[apiMessages.current.length - 1]
+        if (lastUserMsg?.role === 'user') {
+          const textBlock = (lastUserMsg.content || []).find(c => c.type === 'text')
+          pendingQuestion.current = textBlock?.text || ''
+          apiMessages.current.pop()
+        }
+        if (refreshProviders) refreshProviders()
+        setShowApiKeySetup(true)
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${msg}` }])
+      }
     }
 
     setIsLoading(false)
@@ -638,20 +688,20 @@ export default function ChatPanel({
       {/* Header — drag handle */}
       <div className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
         <span
-          className={`glimpse-icon-fixed chat-header-eye ${eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-single-blink' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!isLoading && !eyeAnim) {
-              setEyebrowWiggle(false)
-              void e.currentTarget.offsetWidth
-              setEyebrowWiggle(true)
-              setTimeout(() => setEyebrowWiggle(false), 500)
-            }
-          }}
-          style={{ cursor: 'pointer' }}
-        >
-          <GlimpseIcon size={24} focused={isPinned} />
-        </span>
+            className={`glimpse-icon-fixed chat-header-eye ${eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-single-blink' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!isLoading && !eyeAnim) {
+                setEyebrowWiggle(false)
+                void e.currentTarget.offsetWidth
+                setEyebrowWiggle(true)
+                setTimeout(() => setEyebrowWiggle(false), 500)
+              }
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <GlimpseIcon size={24} focused={isPinned} />
+          </span>
         <div className="chat-header-info" style={{ position: 'relative' }}>
           <button
             className="chat-header-title-btn"
@@ -740,24 +790,22 @@ export default function ChatPanel({
             setShowApiKeySetup(false)
             if (refreshProviders) await refreshProviders()
             setShowWelcome(true)
-            setTimeout(() => {
-              setShowWelcome(false)
-            }, 4500)
           }} />
         ) : showWelcome ? (
-          <div className="api-key-welcome">
-            <span className="glimpse-icon-fixed logo-draw-only" ref={(el) => {
-              if (el) {
-                setTimeout(() => {
-                  el.classList.remove('logo-draw-only')
-                  void el.offsetWidth
-                  el.classList.add('logo-draw-only')
-                }, 1800)
-              }
-            }}>
-              <GlimpseIcon size={32} />
-            </span>
-            <span>Connected. Happy Glimpsing!</span>
+          <div className="api-key-welcome connected-anim">
+            <div className="c-eye-wrapper">
+              <div className="c-eye">
+                <svg className="c-closed" viewBox="60 140 420 280" width="100" height="67" aria-hidden="true">
+                  <path className="brow" d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round"/>
+                  <path className="spiral" d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round"/>
+                </svg>
+                <svg className="c-awake" viewBox="60 140 420 280" width="100" height="67" aria-hidden="true">
+                  <path className="brow" d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round"/>
+                  <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <span className="c-text">Connected. Happy Glimpsing!</span>
           </div>
         ) : (
           <>
@@ -881,14 +929,19 @@ export default function ChatPanel({
               })}
               {isLoading && (
                 <div className="chat-msg assistant" ref={lastAssistantRef}>
-                  <div className="thinking">
-                    <div className="glimpsing-eye">
-                      <svg viewBox="60 140 420 280" width="16" height="11">
+                  <div className="thinking" role="status" aria-label="Processing your request">
+                    <div className="scan-stage-sm">
+                      <svg className="scan-ghost-sm" viewBox="60 140 420 280" width="28" height="19" aria-hidden="true">
                         <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round"/>
                         <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round"/>
                       </svg>
+                      <svg className="scan-reveal-sm" viewBox="60 140 420 280" width="28" height="19" aria-hidden="true">
+                        <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="#6C63FF" strokeWidth="20" strokeLinecap="round"/>
+                        <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="#6C63FF" strokeWidth="22" strokeLinecap="round"/>
+                      </svg>
+                      <div className="scan-frame-sm" />
                     </div>
-                    <span className="glimpsing-text">Glimpsing...</span>
+                    <span className="scan-label">Glimpsing...</span>
                   </div>
                 </div>
               )}

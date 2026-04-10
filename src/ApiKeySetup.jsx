@@ -63,7 +63,7 @@ export default function ApiKeySetup({ onDone, onSkip }) {
 
       {mode === 'keys' ? (
         <>
-          <p className="api-key-desc">{savedProviders.length > 0 ? 'Add more keys or start chatting.' : 'Keys stay on your device.'}</p>
+          {savedProviders.length === 0 && <p className="api-key-desc">Keys stay on your device.</p>}
 
           {selectedProvider === null ? (
             <>
@@ -109,14 +109,14 @@ export default function ApiKeySetup({ onDone, onSkip }) {
                 />
                 {!error && (
                   <span className="api-key-hint">
-                    <a href="#" onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url) }}>
+                    <button className="api-key-hint-link" onClick={() => window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url)}>
                       Get key
-                    </a>
+                    </button>
                   </span>
                 )}
               </div>
 
-              {error && <div className="api-key-error">Invalid key. <a href="#" onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url) }}>Get a new one</a></div>}
+              {error && <div className="api-key-error">Invalid key. <button className="api-key-error-link" onClick={() => window.electronAPI?.openExternal(PROVIDERS.find(p => p.id === selectedProvider)?.url)}>Get a new one</button></div>}
 
               <button className="api-key-save" onClick={handleSave} disabled={!hasInput || saving}>
                 {saving ? 'Verifying...' : 'Connect'}
@@ -154,7 +154,7 @@ export default function ApiKeySetup({ onDone, onSkip }) {
         </button>
         {onSkip && (
           <>
-            <span className="api-key-dot">·</span>
+            <span className="api-key-dot" aria-hidden="true">·</span>
             <button className="api-key-link" onClick={onSkip}>Skip for now</button>
           </>
         )}

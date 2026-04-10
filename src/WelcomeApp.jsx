@@ -140,6 +140,8 @@ export default function WelcomeApp() {
                   <path d="M98 212C152 174 365 158 420 248" fill="none" stroke="var(--brand)" strokeWidth="20" strokeLinecap="round" />
                   <path d="M262 374C228 373 176 360 128 321C176 276 314 200 390 270C462 336 350 379 322 374C248 361 262 276 322 279C378 282 363 346 322 332" fill="none" stroke="var(--brand)" strokeWidth="22" strokeLinecap="round" />
                 </svg>
+                {/* Cursor dot — lands before frame expands */}
+                <div className="w-cursor-dot" />
                 {/* Selection frame */}
                 <div className="w-crop-frame" />
                 {/* Full-color overlay — clip-path reveal */}
