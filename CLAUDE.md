@@ -83,7 +83,10 @@ pkill -f "[Gg]limpse"; lsof -ti:5173 | xargs kill -9
 - `set_single_space` = `FullScreenAuxiliary (1<<8)` only = 256
 - `set_move_to_active_space` = `MoveToActiveSpace (1<<1) | FullScreenAuxiliary (1<<8)` = 258 — **do NOT use with fullscreen**
 
-**Long-term optimization**: Replace NSWindow with NSPanel (`.nonactivatingPanel`) for chat. NSPanel natively floats on fullscreen Spaces without Accessory policy, eliminating the need for destroy+recreate, CGS private APIs, and collection behavior gymnastics. Raycast, Alfred, and Arc all use NSPanel for this reason.
+**NSPanel experiment (FAILED — 2026-04-10)**:
+Attempted `object_setClass` to swizzle NSWindow→NSPanel for cleaner fullscreen support. Result: **fullscreen floating worked, but keyboard input completely broken**. Root cause: `object_setClass` changes the class pointer but the window was never initialized through NSPanel's `initWithContentRect:styleMask:backing:defer:` path, so the Window Server's internal `kCGSPreventsActivationTagBit` is never properly set. `_setPreventsActivation:false` (private API) didn't fix it either. Tried: canBecomeKey/canBecomeMain overrides, NonactivatingPanel toggle, activateIgnoringOtherApps, makeKeyAndOrderFront, unhide — none worked.
+
+**Next approach to try**: Create a REAL NSPanel from scratch via `alloc/initWithContentRect:`, then reparent Tauri's WKWebView content into it. This requires managing the panel lifecycle outside Tauri's window system. More invasive but would properly initialize the panel. Alternatively, contribute a proper NSPanel window type to tauri-nspanel crate for Tauri v2.
 
 ### Fullscreen Space Support
 **User experience**: User is in a fullscreen app (e.g., Safari), presses Cmd+Shift+Z. Overlay must appear ON TOP of the fullscreen app, not on another desktop.
