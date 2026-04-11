@@ -60,6 +60,8 @@ export default function useThreadManager() {
   const handleNewThread = useCallback(() => {
     setCurrentThread(newThread())
     setIsNewThread(true)
+    // Reset window to compact size for empty chat
+    window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
   }, [])
 
   const handleSetCurrentThread = useCallback((thread) => {
@@ -82,6 +84,7 @@ export default function useThreadManager() {
     setRecentThreads([])
     setCurrentThread(newThread())
     setIsNewThread(true)
+    window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
     window.electronAPI?.refreshTrayMenu?.()
   }, [recentThreads])
 

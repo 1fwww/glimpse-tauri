@@ -120,9 +120,9 @@ export default function ChatPanel({
   const pendingImageRef = useRef(null)
   const pendingSnippetRef = useRef(null)
 
-  // Update textContext when initialContext arrives via IPC
+  // Update textContext when initialContext arrives via IPC (including clear)
   useEffect(() => {
-    if (initialContext?.text) setTextContext(initialContext.text)
+    setTextContext(initialContext?.text || '')
   }, [initialContext?.seq])
 
   const [isLoading, setIsLoading] = useState(false)
@@ -298,6 +298,11 @@ export default function ChatPanel({
           setIsLoading(false)
           if (!result?.success) {
             if (result?.code === 'auth_error' || result?.error?.includes('No API key')) {
+              // Re-save pending state so it retries after key setup
+              pendingQuestion.current = q
+              pendingImageRef.current = pendingImage
+              pendingSnippetRef.current = pendingSnippet
+              apiMessages.current.pop()
               if (refreshProviders) refreshProviders()
               setShowApiKeySetup(true)
             } else {
@@ -307,11 +312,11 @@ export default function ChatPanel({
             const assistantText = result.content.map(c => c.text || '').join('')
             const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
             apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
-            // Expand panel for AI response
-            if (!chatFullSize) setChatFullSize(true)
-            window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
+            // Add message, expand panel, then quick scroll to settle
             setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
-            setTimeout(() => scrollToLastAssistant(), 350)
+            if (!chatFullSize) setChatFullSize(true)
+            await window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
+            scrollToLastAssistant()
 
             // Save thread + generate title
             const now = Date.now()
@@ -341,6 +346,10 @@ export default function ChatPanel({
           setIsLoading(false)
           const msg = typeof err === 'string' ? err : (err.message || 'Something went wrong')
           if (msg.includes('API key') || msg.includes('api key') || msg.includes('not found')) {
+            pendingQuestion.current = q
+            pendingImageRef.current = pendingImage
+            pendingSnippetRef.current = pendingSnippet
+            apiMessages.current.pop()
             if (refreshProviders) refreshProviders()
             setShowApiKeySetup(true)
           } else {
@@ -376,9 +385,10 @@ export default function ChatPanel({
   }, [])
 
   const scrollToLastAssistant = useCallback(() => {
-    if (lastAssistantRef.current) {
-      lastAssistantRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+    if (!lastAssistantRef.current || !messagesContainerRef.current) return
+    const el = messagesContainerRef.current
+    const target = lastAssistantRef.current.offsetTop - el.offsetTop
+    el.scrollTop = target
   }, [])
 
   const saveCurrentThread = useCallback(async (thread) => {
@@ -505,14 +515,11 @@ export default function ChatPanel({
         const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
         const assistantApiMsg = { role: 'assistant', content: result.content, model: currentModelName }
         apiMessages.current.push(assistantApiMsg)
-        // Expand panel BEFORE adding content so panel grows while content fades in
-        if (!chatFullSize) setChatFullSize(true)
-        window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
-        await new Promise(r => setTimeout(r, 50))
+        // Add message, expand panel, then quick scroll to settle
         setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
-
-        // Scroll to start of assistant message after expansion completes
-        setTimeout(() => scrollToLastAssistant(), 350)
+        if (!chatFullSize) setChatFullSize(true)
+        await window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
+        scrollToLastAssistant()
 
         const now = Date.now()
         const thread = {
@@ -546,7 +553,9 @@ export default function ChatPanel({
           const lastUserMsg = apiMessages.current[apiMessages.current.length - 1]
           if (lastUserMsg?.role === 'user') {
             const textBlock = (lastUserMsg.content || []).find(c => c.type === 'text')
+            const imageBlock = (lastUserMsg.content || []).find(c => c.type === 'image')
             pendingQuestion.current = textBlock?.text || ''
+            if (imageBlock) pendingImageRef.current = `data:${imageBlock.source?.media_type || 'image/png'};base64,${imageBlock.source?.data}`
             apiMessages.current.pop()
           }
           if (refreshProviders) refreshProviders()
@@ -562,7 +571,9 @@ export default function ChatPanel({
         const lastUserMsg = apiMessages.current[apiMessages.current.length - 1]
         if (lastUserMsg?.role === 'user') {
           const textBlock = (lastUserMsg.content || []).find(c => c.type === 'text')
+          const imageBlock = (lastUserMsg.content || []).find(c => c.type === 'image')
           pendingQuestion.current = textBlock?.text || ''
+          if (imageBlock) pendingImageRef.current = `data:${imageBlock.source?.media_type || 'image/png'};base64,${imageBlock.source?.data}`
           apiMessages.current.pop()
         }
         if (refreshProviders) refreshProviders()
@@ -787,8 +798,11 @@ export default function ChatPanel({
             setChatFullSize(false)
             if (onMinimize) onMinimize()
           }} onDone={async () => {
-            setShowApiKeySetup(false)
+            // Await providers BEFORE changing state — otherwise React flushes
+            // an intermediate render with (showApiKeySetup=false, providers=[], showWelcome=false)
+            // which triggers the "No API keys found" useEffect and clears pendingQuestion.
             if (refreshProviders) await refreshProviders()
+            setShowApiKeySetup(false)
             setShowWelcome(true)
           }} />
         ) : showWelcome ? (
