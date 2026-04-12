@@ -337,7 +337,7 @@
   width: 100vw;
   height: 100vh;
   background: transparent;
-  padding: 6px;
+  padding: 0;
   -webkit-app-region: no-drag;
 }
 
@@ -349,15 +349,13 @@
   border: none;
   box-shadow:
     0 0 0 0.5px rgba(255, 255, 255, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 3px 6px rgba(0, 0, 0, 0.12),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition:
     background 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.3s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -365,8 +363,6 @@
 .theme-light .chat-only-inner {
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    0 3px 6px rgba(0, 0, 0, 0.06),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.7);
 }
 
@@ -387,26 +383,24 @@
   transition: background 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1), padding 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Chat-only pinned — brand-tinted ring, slightly deeper shadow */
+/* Chat-only pinned — brand-tinted ring, rounder corners */
 .chat-only-inner.pinned {
   background: var(--surface-pinned);
-  padding: 4px;
+  border-radius: 20px;
   box-shadow:
     0 0 0 0.5px rgba(108, 99, 255, 0.15),
     0 0 0 1px rgba(108, 99, 255, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 4px 8px rgba(0, 0, 0, 0.15),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
 }
 
+/* Light mode pinned — aluminum metal */
 .theme-light .chat-only-inner.pinned {
-  background: var(--surface-pinned);
+  background: linear-gradient(180deg, #EEEFF3 0%, #E1E2E8 100%);
   box-shadow:
-    0 0 0 0.5px rgba(108, 99, 255, 0.1),
-    0 0 0 1px rgba(108, 99, 255, 0.04),
-    0 1px 3px rgba(0, 0, 0, 0.06),
-    0 4px 8px rgba(0, 0, 0, 0.05),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.6);
+    0 0 0 0.5px rgba(0, 0, 0, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.07),
+    0 4px 16px rgba(0, 0, 0, 0.09),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
 }
 
 /* Subtler separators when pinned */
@@ -1417,12 +1411,13 @@
   background: var(--surface-panel);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-active);
+  border: none;
   border-radius: var(--radius-md);
   padding: 5px;
   box-shadow:
-    0 0 1px var(--brand-border),
-    0 4px 20px rgba(0, 0, 0, 0.5);
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 .edit-tool-btn {
@@ -1526,12 +1521,13 @@
   background: var(--surface-panel);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-active);
+  border: none;
   border-radius: 8px;
   padding: 4px 6px;
   box-shadow:
-    0 0 1px var(--brand-border),
-    0 4px 20px rgba(0, 0, 0, 0.5);
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    0 3px 8px rgba(0, 0, 0, 0.15);
   animation: panelSlideIn 0.15s ease-out;
 }
 
@@ -2340,7 +2336,7 @@
   width: 100vw;
   height: 100vh;
   background: transparent;
-  padding: 6px;
+  padding: 0;
   -webkit-app-region: drag;
 }
 
@@ -2349,11 +2345,19 @@
   height: 100%;
   background: var(--surface-base);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-dim);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  border: none;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.theme-light .welcome-inner {
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.7);
 }
 
 .welcome-content {
@@ -3686,7 +3690,7 @@
   width: 100vw;
   height: 100vh;
   background: transparent;
-  padding: 6px;
+  padding: 0;
 }
 
 .settings-inner {
@@ -3694,12 +3698,20 @@
   height: 100%;
   background: var(--surface-base);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-dim);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  border: none;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: settingsIn 0.2s ease-out;
+}
+
+.theme-light .settings-inner {
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.7);
 }
 
 @keyframes settingsIn {
