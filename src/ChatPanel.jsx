@@ -312,10 +312,12 @@ export default function ChatPanel({
             const assistantText = result.content.map(c => c.text || '').join('')
             const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
             apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
-            // Add message, expand panel, then quick scroll to settle
+            // Add message, expand panel, then scroll to top of assistant response
             setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
             if (!chatFullSize) setChatFullSize(true)
             await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
+            // Wait one frame for React to render the new message DOM
+            await new Promise(r => requestAnimationFrame(r))
             scrollToLastAssistant()
 
             // Save thread + generate title
@@ -515,10 +517,11 @@ export default function ChatPanel({
         const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
         const assistantApiMsg = { role: 'assistant', content: result.content, model: currentModelName }
         apiMessages.current.push(assistantApiMsg)
-        // Add message, expand panel, then quick scroll to settle
+        // Add message, expand panel, then scroll to top of assistant response
         setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
         if (!chatFullSize) setChatFullSize(true)
         await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
+        // Wait for React to render the new message before scrolling
         scrollToLastAssistant()
 
         const now = Date.now()
