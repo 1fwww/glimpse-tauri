@@ -110,8 +110,12 @@ export default function useThreadManager() {
       setRecentThreads(threads || [])
       const mostRecent = threads?.[0]
       if (mostRecent && (Date.now() - mostRecent.updatedAt) < STALE_THRESHOLD) {
-        // Back to existing thread — expanded
-        setCurrentThread(mostRecent)
+        // Back to existing thread — expanded.
+        // Skip setCurrentThread if same thread (avoids heavy React re-render
+        // of all messages during fade-in animation)
+        if (currentThreadRef.current?.id !== mostRecent.id) {
+          setCurrentThread(mostRecent)
+        }
         setIsNewThread(false)
         window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550, animate: false })
       } else {

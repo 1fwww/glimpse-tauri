@@ -99,6 +99,7 @@ if (window.__TAURI_INTERNALS__ && !window.electronAPI) {
     onClearScreenshot: (callback) => listen('clear-screenshot', callback),
     onClearTextContext: (callback) => listen('clear-text-context', callback),
     onCheckSize: (callback) => listen('check-size', callback),
+    onStartNewThread: (callback) => listen('start-new-thread', callback),
     onTextContext: (callback) => listen('text-context', callback),
     onShortcutTried: (callback) => listen('shortcut-tried', callback),
     onResetOverlay: (callback) => listen('reset-overlay', callback),
