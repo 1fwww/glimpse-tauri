@@ -76,6 +76,9 @@ export default function App() {
       setCopyFeedback(false)
       setSaveFeedback(false)
       setIsExiting(false)
+      setAnnotations([])
+      setUndoStack([])
+      setActiveTool(null)
     }
 
     const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset, preSelection) => {

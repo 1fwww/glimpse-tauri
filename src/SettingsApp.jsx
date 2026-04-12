@@ -120,7 +120,7 @@ export default function SettingsApp() {
     let blurTimer = null
     const handleBlur = () => {
       if (suppressBlur.current) return
-      blurTimer = setTimeout(handleClose, 150)
+      blurTimer = setTimeout(handleClose, 300)
     }
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('blur', handleBlur)
