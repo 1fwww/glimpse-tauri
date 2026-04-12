@@ -7,6 +7,7 @@ import './app.css'
 
 export default function App() {
   const [screenImage, setScreenImage] = useState(null)
+  const screenImageRef = useRef(null)
   const [selection, setSelection] = useState(null)
   const [isSelecting, setIsSelecting] = useState(false)
   const [startPos, setStartPos] = useState(null)
@@ -65,6 +66,7 @@ export default function App() {
     if (!window.electronAPI) return
 
     const resetState = () => {
+      setScreenImage(null)
       setSelection(null)
       setChatVisible(false)
       setChatFullSize(false)
@@ -76,9 +78,11 @@ export default function App() {
       setIsExiting(false)
     }
 
-    const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset) => {
-      setScreenImage(dataUrl)
-      tm.refreshProviders() // Ensure providers are current (key may have been added in chat-only)
+    const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset, preSelection) => {
+      resetState()  // Clear all state first (including screenImage)
+      setScreenImage(dataUrl)  // Then set new image (AFTER reset, so it's not cleared)
+      screenImageRef.current = dataUrl
+      tm.refreshProviders()
       setDisplayInfo(dispInfo || null)
       setWindowOffset(offset || { x: 0, y: 0 })
       const off = offset || { x: 0, y: 0 }
@@ -87,17 +91,34 @@ export default function App() {
         x: win.x - off.x,
         y: win.y - off.y,
       })))
-      resetState()
-      // Ensure overlay has keyboard focus for ESC handling
+      // Apply pre-computed selection from native overlay (if present)
+      if (preSelection && preSelection.w > 10 && preSelection.h > 10) {
+        setSelection(preSelection)
+        setIsSelecting(false)
+        setChatVisible(true)
+        // Same minimize logic as mouseUp: if chat was open before → stay open.
+        // Native selection always starts fresh (no prior chat was open), so use
+        // userMinimizedRef (persisted preference) or isNewThread as fallback.
+        setChatMinimized(userMinimizedRef.current || tm.isNewThread)
+        setTimeout(() => cropSelection(preSelection, dataUrl), 50)
+      }
+      // Signal Swift after React renders + image decodes.
+      // 50ms lets React batch + flush state updates (synchronous, typically <20ms).
+      // Then preload the image to ensure it's decoded in memory.
+      setTimeout(() => {
+        const img = new Image()
+        img.onload = () => window.electronAPI?.overlayRendered?.()
+        img.onerror = () => window.electronAPI?.overlayRendered?.()
+        img.src = dataUrl
+      }, 50)
       window.focus()
-
       tm.refreshWithHeuristic()
     })
 
     const removeNewCapture = window.electronAPI.onNewCapture((dataUrl, dispInfo) => {
+      resetState()
       setScreenImage(dataUrl)
       setDisplayInfo(dispInfo || null)
-      resetState()
     })
 
     const removeReset = window.electronAPI.onResetOverlay?.(() => {
@@ -108,10 +129,26 @@ export default function App() {
       }
     })
 
+    // Native selection handoff: selection rect pre-computed by Swift CAShapeLayer overlay.
+    // Fires after screen-captured, so screenImage is already set.
+    const removeApplySelection = window.electronAPI.onApplySelection?.((sel) => {
+      if (sel && sel.w > 10 && sel.h > 10) {
+        setSelection(sel)
+        setIsSelecting(false)
+        // Crop + show chat — same as mouseUp with valid selection
+        setTimeout(() => {
+          cropSelection(sel, screenImageRef.current)
+          setChatVisible(true)
+          setChatFullSize(false)
+        }, 50)
+      }
+    })
+
     return () => {
       removeScreenCaptured?.()
       removeNewCapture?.()
       removeReset?.()
+      removeApplySelection?.()
     }
   }, [])
 
@@ -369,9 +406,15 @@ export default function App() {
   }
 
   const handleMouseMove = (e) => {
-    // rAF throttle — max one update per frame
-    if (rafRef.current) return
-    rafRef.current = requestAnimationFrame(() => { rafRef.current = null })
+    // During active drag operations (resize, move, new selection), process every
+    // mousemove immediately — direct DOM updates are cheap and skipping events
+    // causes visible lag (rectangle trails cursor). Browser batches to vsync anyway.
+    const isDragging = isResizingSelection || isMovingSelection || (isSelecting && startPos)
+    if (!isDragging) {
+      // rAF throttle for non-drag operations (hover detection, cursor updates)
+      if (rafRef.current) return
+      rafRef.current = requestAnimationFrame(() => { rafRef.current = null })
+    }
 
     // Resizing existing selection
     if (isResizingSelection && moveStart.current) {
@@ -611,7 +654,7 @@ export default function App() {
                 <rect ref={maskRectRef} x={selection.x} y={selection.y} width={selection.w} height={selection.h} fill="black" />
               </mask>
             </defs>
-            <rect width="100%" height="100%" fill="rgba(4, 8, 16, 0.55)" mask="url(#selectionMask)" />
+            <rect width="100%" height="100%" fill="rgba(4, 8, 16, 0.20)" mask="url(#selectionMask)" />
           </svg>
         )}
         {!selection && hoveredWindow && (
@@ -622,7 +665,7 @@ export default function App() {
                 <rect x={hoveredWindow.x} y={hoveredWindow.y} width={hoveredWindow.w} height={hoveredWindow.h} fill="black" />
               </mask>
             </defs>
-            <rect width="100%" height="100%" fill="rgba(4, 8, 16, 0.55)" mask="url(#hoverMask)" />
+            <rect width="100%" height="100%" fill="rgba(4, 8, 16, 0.20)" mask="url(#hoverMask)" />
           </svg>
         )}
         {!selection && !hoveredWindow && <div className="full-dim" />}
