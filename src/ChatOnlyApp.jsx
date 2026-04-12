@@ -21,8 +21,11 @@ export default function ChatOnlyApp() {
     window.electronAPI?.onLoadThreadData?.((data) => {
       if (data) {
         // Pin sends { thread, croppedImage }, open-thread sends thread directly
+        // Use setCurrentThread (not handleThreadChange) to avoid resizeChatWindow —
+        // in chat-only mode the panel fills the window, Swift controls the size.
         const thread = data.thread || data
-        tm.handleThreadChange(thread)
+        tm.setCurrentThread(thread)
+        if (thread?.messages?.length > 0) tm.setIsNewThread(false)
         if (data.croppedImage) setCroppedImage(data.croppedImage)
       }
     })

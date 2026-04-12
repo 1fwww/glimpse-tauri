@@ -247,7 +247,7 @@ export default function ChatPanel({
   useEffect(() => {
     if (showApiKeySetup) {
       if (!chatFullSize) setChatFullSize(true)
-      window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
+      window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
       window.electronAPI?.lowerOverlay?.()
     } else {
       window.electronAPI?.restoreOverlay?.()
@@ -315,7 +315,7 @@ export default function ChatPanel({
             // Add message, expand panel, then quick scroll to settle
             setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
             if (!chatFullSize) setChatFullSize(true)
-            await window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
+            await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
             scrollToLastAssistant()
 
             // Save thread + generate title
@@ -518,7 +518,7 @@ export default function ChatPanel({
         // Add message, expand panel, then quick scroll to settle
         setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
         if (!chatFullSize) setChatFullSize(true)
-        await window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550 })
+        await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
         scrollToLastAssistant()
 
         const now = Date.now()

@@ -354,9 +354,9 @@
   flex-direction: column;
   overflow: hidden;
   transition:
-    background 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Light mode — unpinned */
@@ -383,38 +383,44 @@
   transition: background 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1), padding 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Chat-only pinned — brand-tinted ring, rounder corners */
+/* Chat-only pinned — brand glow + depth */
 .chat-only-inner.pinned {
   background: var(--surface-pinned);
   border-radius: 20px;
   box-shadow:
-    0 0 0 0.5px rgba(108, 99, 255, 0.15),
-    0 0 0 1px rgba(108, 99, 255, 0.06),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
+    0 0 0 1px rgba(108, 99, 255, 0.18),
+    0 0 24px rgba(108, 99, 255, 0.14),
+    0 4px 16px rgba(0, 0, 0, 0.30),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Light mode pinned — aluminum metal */
+/* Light mode pinned — brushed aluminum + brand glow */
 .theme-light .chat-only-inner.pinned {
-  background: linear-gradient(180deg, #EEEFF3 0%, #E1E2E8 100%);
+  background: linear-gradient(180deg,
+    #F2F1F6 0%,
+    #E9EAF0 30%,
+    #DDDFE8 70%,
+    #D4D6E0 100%);
   box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.14),
-    0 1px 3px rgba(0, 0, 0, 0.07),
-    0 4px 16px rgba(0, 0, 0, 0.09),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
+    0 0 0 1px rgba(108, 99, 255, 0.18),
+    0 0 28px rgba(108, 99, 255, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Subtler separators when pinned */
+/* No dividers when pinned — gradient flows uninterrupted like solid metal */
 .chat-only-app .pinned-panel .chat-header {
-  border-bottom-color: rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.03);
+  border-bottom-color: transparent;
+  background: transparent;
 }
 
 .chat-only-app .pinned-panel .chat-input-box {
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: transparent;
 }
 
 .chat-only-app .pinned-panel .chat-input-area {
-  border-top-color: rgba(255, 255, 255, 0.06);
+  border-top-color: transparent;
 }
 
 .chat-only-app .chat-header {

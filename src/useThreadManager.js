@@ -61,9 +61,9 @@ export default function useThreadManager() {
     setIsNewThread(false)
     // Existing thread with messages → expanded, empty → compact
     if (thread?.messages?.length > 0) {
-      window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550, animate: false })
+      window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550, animate: false })
     } else {
-      window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
+      window.electronAPI?.resizeChatWindow?.({ width: 380, height: 412, animate: false })
     }
   }, [])
 
@@ -71,7 +71,7 @@ export default function useThreadManager() {
     setCurrentThread(newThread())
     setIsNewThread(true)
     // Reset window to compact size for empty chat
-    window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
+    window.electronAPI?.resizeChatWindow?.({ width: 380, height: 412, animate: false })
   }, [])
 
   const handleSetCurrentThread = useCallback((thread) => {
@@ -94,7 +94,7 @@ export default function useThreadManager() {
     setRecentThreads([])
     setCurrentThread(newThread())
     setIsNewThread(true)
-    window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
+    window.electronAPI?.resizeChatWindow?.({ width: 380, height: 412, animate: false })
     window.electronAPI?.refreshTrayMenu?.()
   }, [recentThreads])
 
@@ -103,7 +103,7 @@ export default function useThreadManager() {
     // If current thread has no messages (empty new chat), stay compact — don't restore
     const cur = currentThreadRef.current
     if (cur && (!cur.messages || cur.messages.length === 0)) {
-      window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
+      window.electronAPI?.resizeChatWindow?.({ width: 380, height: 412, animate: false })
       return
     }
 
@@ -114,12 +114,12 @@ export default function useThreadManager() {
         // Back to existing thread — expanded
         setCurrentThread(mostRecent)
         setIsNewThread(false)
-        window.electronAPI?.resizeChatWindow?.({ width: 420, height: 550, animate: false })
+        window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550, animate: false })
       } else {
         // New thread — compact
         setCurrentThread(newThread())
         setIsNewThread(true)
-        window.electronAPI?.resizeChatWindow?.({ width: 432, height: 412, animate: false })
+        window.electronAPI?.resizeChatWindow?.({ width: 380, height: 412, animate: false })
       }
     })
   }, [])
