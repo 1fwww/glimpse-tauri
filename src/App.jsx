@@ -81,9 +81,28 @@ export default function App() {
       setActiveTool(null)
     }
 
-    const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset, preSelection) => {
-      resetState()  // Clear all state first (including screenImage)
-      setScreenImage(dataUrl)  // Then set new image (AFTER reset, so it's not cleared)
+    // Reset screenshot/UI state but keep chat thread (messages, chatVisible, chatFullSize)
+    const resetStateKeepThread = () => {
+      setScreenImage(null)
+      setSelection(null)
+      setIsSelecting(false)
+      setHoveredWindow(null)
+      setFrozenChatPos(null)
+      setCopyFeedback(false)
+      setSaveFeedback(false)
+      setIsExiting(false)
+      setAnnotations([])
+      setUndoStack([])
+      setActiveTool(null)
+    }
+
+    const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset, preSelection, keepThread, wasNewThread) => {
+      if (keepThread) {
+        resetStateKeepThread()
+      } else {
+        resetState()
+      }
+      setScreenImage(dataUrl)
       screenImageRef.current = dataUrl
       tm.refreshProviders()
       setDisplayInfo(dispInfo || null)
@@ -99,11 +118,15 @@ export default function App() {
         setSelection(preSelection)
         setIsSelecting(false)
         setChatVisible(true)
-        // Same minimize logic as mouseUp: if chat was open before → stay open.
-        // Native selection always starts fresh (no prior chat was open), so use
-        // userMinimizedRef (persisted preference) or isNewThread as fallback.
-        setChatMinimized(userMinimizedRef.current || tm.isNewThread)
-        setTimeout(() => cropSelection(preSelection, dataUrl), 50)
+        if (keepThread && !wasNewThread) {
+          // Continuing existing conversation — preserve expand state
+          setChatMinimized(userMinimizedRef.current)
+        } else {
+          // New thread (stale, fresh, or "+" was clicked) — compact
+          setChatMinimized(true)
+          setChatFullSize(false)
+        }
+        setTimeout(() => cropSelection(preSelection, dataUrl, dispInfo, offset), 50)
       }
       // Signal Swift after React renders + image decodes.
       // 50ms lets React batch + flush state updates (synchronous, typically <20ms).
@@ -115,7 +138,7 @@ export default function App() {
         img.src = dataUrl
       }, 50)
       window.focus()
-      tm.refreshWithHeuristic()
+      if (!keepThread) tm.refreshWithHeuristic()
     })
 
     const removeNewCapture = window.electronAPI.onNewCapture((dataUrl, dispInfo) => {
@@ -126,10 +149,13 @@ export default function App() {
 
     const removeReset = window.electronAPI.onResetOverlay?.(() => {
       resetState()
-      // Reply pong only if we're actually visible (not during close)
       if (document.visibilityState === 'visible') {
         window.__TAURI_INTERNALS__?.invoke('overlay_pong').catch(() => {})
       }
+    })
+
+    const removeResetKeepThread = window.electronAPI.onResetOverlayKeepThread?.(() => {
+      resetStateKeepThread()
     })
 
     // Native selection handoff: selection rect pre-computed by Swift CAShapeLayer overlay.
@@ -140,7 +166,7 @@ export default function App() {
         setIsSelecting(false)
         // Crop + show chat — same as mouseUp with valid selection
         setTimeout(() => {
-          cropSelection(sel, screenImageRef.current)
+          cropSelection(sel, screenImageRef.current, displayInfo, windowOffset)
           setChatVisible(true)
           setChatFullSize(false)
         }, 50)
@@ -151,6 +177,7 @@ export default function App() {
       removeScreenCaptured?.()
       removeNewCapture?.()
       removeReset?.()
+      removeResetKeepThread?.()
       removeApplySelection?.()
     }
   }, [])
@@ -263,19 +290,20 @@ export default function App() {
     }
   }, [getHiResComposite])
 
-  const cropSelection = useCallback((sel, imgDataUrl) => {
+  const cropSelection = useCallback((sel, imgDataUrl, dispInfo, offset) => {
     if (!sel || !imgDataUrl) return
 
     const img = new Image()
     img.onload = () => {
-      const displayW = displayInfo?.width || window.innerWidth
-      const displayH = displayInfo?.height || window.innerHeight
+      const displayW = dispInfo?.width || window.innerWidth
+      const displayH = dispInfo?.height || window.innerHeight
+      const off = offset || { x: 0, y: 0 }
       const scaleX = img.naturalWidth / displayW
       const scaleY = img.naturalHeight / displayH
 
       const canvas = document.createElement('canvas')
-      const sx = (sel.x + windowOffset.x) * scaleX
-      const sy = (sel.y + windowOffset.y) * scaleY
+      const sx = (sel.x + off.x) * scaleX
+      const sy = (sel.y + off.y) * scaleY
       const sw = sel.w * scaleX
       const sh = sel.h * scaleY
 
@@ -296,7 +324,7 @@ export default function App() {
       setCroppedImage(canvas.toDataURL('image/jpeg', 0.85))
     }
     img.src = imgDataUrl
-  }, [displayInfo, windowOffset])
+  }, [])
 
   const findWindowAtPoint = useCallback((x, y) => {
     for (const win of windowBounds) {
@@ -516,7 +544,7 @@ export default function App() {
         setSelection(selectionRef.current)
         selectionRef.current = null
       }
-      if (finalSel) cropSelection(finalSel, screenImage)
+      if (finalSel) cropSelection(finalSel, screenImage, displayInfo, windowOffset)
       return
     }
 
@@ -530,7 +558,7 @@ export default function App() {
         setSelection(selectionRef.current)
         selectionRef.current = null
       }
-      if (finalSel) cropSelection(finalSel, screenImage)
+      if (finalSel) cropSelection(finalSel, screenImage, displayInfo, windowOffset)
       return
     }
 
@@ -550,7 +578,7 @@ export default function App() {
       setHoveredWindow(null)
       setChatVisible(true)
       setChatMinimized(chatWasOpenRef.current ? false : (userMinimizedRef.current || tm.isNewThread))
-      cropSelection(finalSel, screenImage)
+      cropSelection(finalSel, screenImage, displayInfo, windowOffset)
       return
     }
 
@@ -563,7 +591,7 @@ export default function App() {
       setHoveredWindow(null)
       setChatVisible(true)
       setChatMinimized(chatWasOpenRef.current ? false : (userMinimizedRef.current || tm.isNewThread))
-      cropSelection(sel, screenImage)
+      cropSelection(sel, screenImage, displayInfo, windowOffset)
     } else {
       closeWithAnimation()
     }
@@ -776,7 +804,16 @@ export default function App() {
           currentThread={tm.currentThread}
           setCurrentThread={tm.setCurrentThread}
           recentThreads={tm.recentThreads}
-          onThreadChange={tm.handleThreadChange}
+          onThreadChange={(thread) => {
+            tm.handleThreadChange(thread)
+            if (thread?.messages?.length > 0) {
+              setChatFullSize(true)
+              setChatMinimized(false)
+            } else {
+              setChatFullSize(false)
+              setChatMinimized(true)
+            }
+          }}
           onNewThread={tm.handleNewThread}
           onClearAllThreads={tm.handleClearAllThreads}
           onDismissScreenshot={handleDismissScreenshot}

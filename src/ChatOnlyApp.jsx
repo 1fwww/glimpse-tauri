@@ -10,8 +10,8 @@ export default function ChatOnlyApp() {
   const tm = useThreadManager()
 
   useEffect(() => {
-    window.electronAPI?.onTextContext?.((text) => setInitialContext(prev => ({ text: text?.trim() || '', seq: prev.seq + 1 })))
-    window.electronAPI?.onClearTextContext?.(() => setInitialContext({ text: '', seq: 0 }))
+    window.electronAPI?.onTextContext?.((text) => setInitialContext({ text: text?.trim() || '', seq: Date.now() }))
+    window.electronAPI?.onClearTextContext?.(() => setInitialContext(prev => ({ text: '', seq: prev.seq + 1 })))
     window.electronAPI?.onPinState?.((state) => setIsPinned(state))
     window.electronAPI?.onSetCroppedImage?.((img) => setCroppedImage(img))
     window.electronAPI?.onClearScreenshot?.(() => setCroppedImage(null))

@@ -294,7 +294,7 @@ export default function ChatPanel({
 
       // Send to AI without re-adding user message to UI
       setIsLoading(true)
-      setTimeout(() => scrollToBottom(), 50)
+      setTimeout(() => scrollToRevealLoading(), 50)
       ;(async () => {
         try {
           const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
@@ -396,6 +396,20 @@ export default function ChatPanel({
       const msgRect = lastAssistantRef.current.getBoundingClientRect()
       const containerRect = el.getBoundingClientRect()
       el.scrollTop = msgRect.top - containerRect.top
+    })
+  }, [])
+
+  // Scroll so the loading indicator ("Glimpsing...") is just visible at the bottom
+  const scrollToRevealLoading = useCallback(() => {
+    if (!lastAssistantRef.current || !messagesContainerRef.current) return
+    const el = messagesContainerRef.current
+    el.scrollTop = 0
+    requestAnimationFrame(() => {
+      if (!lastAssistantRef.current) return
+      const msgRect = lastAssistantRef.current.getBoundingClientRect()
+      const containerRect = el.getBoundingClientRect()
+      const targetScroll = msgRect.top - containerRect.top - containerRect.height + msgRect.height + 40
+      el.scrollTop = Math.max(0, targetScroll)
     })
   }, [])
 
@@ -502,8 +516,8 @@ export default function ChatPanel({
     setMessages(prev => [...prev, uiMsg])
     setIsLoading(true)
 
-    // Scroll to bottom when user sends (only if expanded — compact mode shouldn't auto-scroll)
-    if (chatFullSize) setTimeout(() => scrollToBottom(), 50)
+    // Scroll to reveal "Glimpsing..." loading indicator
+    setTimeout(() => scrollToRevealLoading(), 50)
 
     if (willAttachImage) {
       lastSentImageRef.current = croppedImage
