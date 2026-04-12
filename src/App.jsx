@@ -59,8 +59,8 @@ export default function App() {
     setAnnotations([])
     setSelectedAnnotation(null)
   }, [annotations])
-  const overlayRef = useRef(null)
 
+  const overlayRef = useRef(null)
 
   useEffect(() => {
     if (!window.electronAPI) return

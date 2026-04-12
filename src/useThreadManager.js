@@ -70,7 +70,8 @@ export default function useThreadManager() {
   const handleNewThread = useCallback(() => {
     setCurrentThread(newThread())
     setIsNewThread(true)
-    // Keep current window size — don't collapse on new chat
+    // Notify Swift so next reopen starts compact
+    window.electronAPI?.notifyNewThread?.()
   }, [])
 
   const handleSetCurrentThread = useCallback((thread) => {

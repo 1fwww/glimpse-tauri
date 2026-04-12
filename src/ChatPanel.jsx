@@ -260,7 +260,6 @@ export default function ChatPanel({
 
   // After welcome animation, auto-send pending question (skip re-adding user msg)
   useEffect(() => {
-    console.log('[PendingQ] showWelcome=', showWelcome, 'pending=', pendingQuestion.current, 'providers=', availableProviders.length, 'provider=', provider, 'modelId=', modelId)
     if (!showWelcome && pendingQuestion.current && availableProviders.length === 0) {
       // Keys saved but no providers available (e.g. dev mode without env vars)
       pendingQuestion.current = null
