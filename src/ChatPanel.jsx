@@ -175,10 +175,14 @@ export default function ChatPanel({
     }
     prevThreadIdRef.current = newId
 
-    setIsAtBottom(true)
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-    }, 50)
+    // Scroll to bottom when switching to an existing thread, but NOT when a new
+    // thread just received its first ID — scrollToLastAssistant handles that case
+    if (!isNewThreadGettingId) {
+      setIsAtBottom(true)
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      }, 50)
+    }
   }, [currentThread?.id])
 
   // Auto-focus input
@@ -316,8 +320,6 @@ export default function ChatPanel({
             setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
             if (!chatFullSize) setChatFullSize(true)
             await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
-            // Wait one frame for React to render the new message DOM
-            await new Promise(r => requestAnimationFrame(r))
             scrollToLastAssistant()
 
             // Save thread + generate title
@@ -389,8 +391,13 @@ export default function ChatPanel({
   const scrollToLastAssistant = useCallback(() => {
     if (!lastAssistantRef.current || !messagesContainerRef.current) return
     const el = messagesContainerRef.current
-    const target = lastAssistantRef.current.offsetTop - el.offsetTop
-    el.scrollTop = target
+    el.scrollTop = 0
+    requestAnimationFrame(() => {
+      if (!lastAssistantRef.current) return
+      const msgRect = lastAssistantRef.current.getBoundingClientRect()
+      const containerRect = el.getBoundingClientRect()
+      el.scrollTop = msgRect.top - containerRect.top
+    })
   }, [])
 
   const saveCurrentThread = useCallback(async (thread) => {
@@ -521,7 +528,6 @@ export default function ChatPanel({
         setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
         if (!chatFullSize) setChatFullSize(true)
         await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
-        // Wait for React to render the new message before scrolling
         scrollToLastAssistant()
 
         const now = Date.now()
