@@ -671,7 +671,7 @@ export default function App() {
         {!selection && !hoveredWindow && <div className="full-dim" />}
       </div>
 
-      {selection && selection.w > 0 && selection.h > 0 && !activeTool && annotations.length === 0 && (
+      {selection && selection.w > 0 && selection.h > 0 && !isSelecting && !activeTool && annotations.length === 0 && (
         <div
           className="selection-move-handle"
           style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}

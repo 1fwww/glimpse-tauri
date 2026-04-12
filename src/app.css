@@ -1030,9 +1030,8 @@
 .chat-input-area {
   padding: 12px;
   border-top: 1px solid var(--border-dim);
-  flex-shrink: 1;
+  flex-shrink: 0;
   min-height: 60px;
-  overflow-y: auto;
 }
 
 .chat-input-box {
@@ -1215,10 +1214,16 @@
 /* Text context snippet */
 .text-context-wrapper {
   margin: 6px 8px 2px;
+  flex-shrink: 1;
+  overflow: hidden;
 }
 
 .text-context-wrapper .msg-snippet {
   max-width: 100%;
+}
+
+.text-context-wrapper .msg-snippet-text {
+  max-height: 80px;  /* tighter than in-message snippets — input area is space-constrained */
 }
 
 .snippet-text {
