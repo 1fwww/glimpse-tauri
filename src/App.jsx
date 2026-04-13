@@ -211,26 +211,32 @@ export default function App() {
   }, [closeWithAnimation, undo])
 
   // Compose screenshot + annotations (compressed for AI chat)
-  const getCompositeImage = useCallback(() => {
-    return new Promise((resolve) => {
-      if (!croppedImage) return resolve(null)
-      const base = new Image()
-      base.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = base.naturalWidth
-        canvas.height = base.naturalHeight
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(base, 0, 0)
+  const getCompositeImage = useCallback(async (imgOverride) => {
+    const img = imgOverride || croppedImage
+    if (!img) return null
+    try {
+      // Convert data URL to blob for createImageBitmap (reliable decode)
+      const resp = await fetch(img)
+      const blob = await resp.blob()
+      const bmp = await createImageBitmap(blob)
 
-        const drawingCanvas = document.querySelector('.drawing-canvas')
-        if (drawingCanvas) {
-          ctx.drawImage(drawingCanvas, 0, 0, canvas.width, canvas.height)
-        }
+      const canvas = document.createElement('canvas')
+      canvas.width = bmp.width
+      canvas.height = bmp.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(bmp, 0, 0)
+      bmp.close()
 
-        resolve(canvas.toDataURL('image/png'))
+      const drawingCanvas = document.querySelector('.drawing-canvas')
+      if (drawingCanvas) {
+        ctx.drawImage(drawingCanvas, 0, 0, canvas.width, canvas.height)
       }
-      base.src = croppedImage
-    })
+
+      const result = canvas.toDataURL('image/png')
+      return result
+    } catch(e) {
+      return null
+    }
   }, [croppedImage])
 
   // High-res composite for save/copy (full resolution from original screenshot)
@@ -238,7 +244,8 @@ export default function App() {
     return new Promise((resolve) => {
       if (!screenImage || !selection) return resolve(null)
       const img = new Image()
-      img.onload = () => {
+      img.onload = async () => {
+        try { await img.decode() } catch(e) {}
         const displayW = displayInfo?.width || window.innerWidth
         const displayH = displayInfo?.height || window.innerHeight
         const scaleX = img.naturalWidth / displayW
@@ -295,16 +302,24 @@ export default function App() {
     }
   }, [getHiResComposite])
 
-  const cropSelection = useCallback((sel, imgDataUrl, dispInfo, offset) => {
-    if (!sel || !imgDataUrl) return
+  const cropSelection = useCallback(async (sel, imgDataUrl, dispInfo, offset) => {
+    if (!sel || !imgDataUrl) {
+      return
+    }
 
-    const img = new Image()
-    img.onload = () => {
+    try {
+      // Use fetch + createImageBitmap for reliable pixel decode.
+      // WKWebView's Image element can fire onload before file:// pixel data
+      // is fully decoded, causing drawImage to read black pixels.
+      const resp = await fetch(imgDataUrl)
+      const blob = await resp.blob()
+      const bmp = await createImageBitmap(blob)
+
       const displayW = dispInfo?.width || window.innerWidth
       const displayH = dispInfo?.height || window.innerHeight
       const off = offset || { x: 0, y: 0 }
-      const scaleX = img.naturalWidth / displayW
-      const scaleY = img.naturalHeight / displayH
+      const scaleX = bmp.width / displayW
+      const scaleY = bmp.height / displayH
 
       const canvas = document.createElement('canvas')
       const sx = (sel.x + off.x) * scaleX
@@ -325,10 +340,11 @@ export default function App() {
       canvas.width = outW
       canvas.height = outH
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH)
+      ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, outW, outH)
+      bmp.close()
       setCroppedImage(canvas.toDataURL('image/jpeg', 0.85))
+    } catch(e) {
     }
-    img.src = imgDataUrl
   }, [])
 
   const findWindowAtPoint = useCallback((x, y) => {

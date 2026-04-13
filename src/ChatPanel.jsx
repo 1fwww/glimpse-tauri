@@ -515,7 +515,7 @@ export default function ChatPanel({
         setTextContext('')
       }
       if (croppedImage) {
-        const composite = await getCompositeImage?.()
+        const composite = await getCompositeImage?.(croppedImage)
         msgEntry.image = composite || croppedImage
         pendingImageRef.current = msgEntry.image
         setScreenshotAttached(false)
@@ -538,8 +538,9 @@ export default function ChatPanel({
     const willAttachImage = croppedImage && (noMessagesSentYet || screenshotAttached)
     let imageForChat = croppedImage
     if (willAttachImage) {
-      // Use annotated composite if available
-      const composite = await getCompositeImage?.()
+      // Use annotated composite if available — pass croppedImage directly
+      // to avoid stale closure in getCompositeImage's useCallback
+      const composite = await getCompositeImage?.(croppedImage)
       if (composite) imageForChat = composite
       const mediaType = imageForChat.startsWith('data:image/jpeg') ? 'image/jpeg' : 'image/png'
       contentBlocks.push({
