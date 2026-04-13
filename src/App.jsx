@@ -16,7 +16,9 @@ export default function App() {
   const [windowBounds, setWindowBounds] = useState([])
   const [hoveredWindow, setHoveredWindow] = useState(null)
   const [displayInfo, setDisplayInfo] = useState(null)
+  const displayInfoRef = useRef(null)
   const [windowOffset, setWindowOffset] = useState({ x: 0, y: 0 })
+  const windowOffsetRef = useRef({ x: 0, y: 0 })
 
   // Shared thread/provider state
   const tm = useThreadManager()
@@ -33,6 +35,7 @@ export default function App() {
   const [undoStack, setUndoStack] = useState([])
   const [selectedAnnotation, setSelectedAnnotation] = useState(null)
   const [mosaicMode, setMosaicMode] = useState('brush')
+  const [arrowStyle, setArrowStyle] = useState('arrow')
 
   // Wrap setAnnotations to track undo/redo
   const updateAnnotations = useCallback((updater) => {
@@ -106,7 +109,9 @@ export default function App() {
       screenImageRef.current = dataUrl
       tm.refreshProviders()
       setDisplayInfo(dispInfo || null)
+      displayInfoRef.current = dispInfo || null
       setWindowOffset(offset || { x: 0, y: 0 })
+      windowOffsetRef.current = offset || { x: 0, y: 0 }
       const off = offset || { x: 0, y: 0 }
       setWindowBounds((bounds || []).map(win => ({
         ...win,
@@ -166,7 +171,7 @@ export default function App() {
         setIsSelecting(false)
         // Crop + show chat — same as mouseUp with valid selection
         setTimeout(() => {
-          cropSelection(sel, screenImageRef.current, displayInfo, windowOffset)
+          cropSelection(sel, screenImageRef.current, displayInfoRef.current, windowOffsetRef.current)
           setChatVisible(true)
           setChatFullSize(false)
         }, 50)
@@ -613,14 +618,22 @@ export default function App() {
 
   const [frozenChatPos, setFrozenChatPos] = useState(null)
 
+  // Pin out from overlay → standalone chat (reused by dismiss, send, and pin button)
+  const pinOutFromOverlay = useCallback((opts = {}) => {
+    const { includeCroppedImage = false, pinned = true, threadOverride = null, pendingSend = false } = opts
+    const panel = document.querySelector('.chat-panel')
+    const r = panel?.getBoundingClientRect()
+    const bounds = r ? { x: r.left, y: r.top, width: r.width, height: r.height } : null
+    window.electronAPI?.pinChat({
+      thread: threadOverride || tm.currentThread,
+      croppedImage: includeCroppedImage ? croppedImage : null,
+      pinned,
+      pendingSend,
+    }, bounds)
+  }, [tm.currentThread, croppedImage])
+
   const handleDismissScreenshot = () => {
-    setFrozenChatPos(getChatPosition())
-    setSelection(null)
-    setCroppedImage(null)
-    setAnnotations([])
-    setUndoStack([])
-    setActiveTool(null)
-    setSelectedAnnotation(null)
+    pinOutFromOverlay({ pinned: false })
   }
 
   const getChatPosition = () => {
@@ -754,6 +767,7 @@ export default function App() {
           selectedIndex={selectedAnnotation}
           setSelectedIndex={setSelectedAnnotation}
           mosaicMode={mosaicMode}
+          arrowStyle={arrowStyle}
           screenImage={screenImage}
           windowOffset={windowOffset}
           displayInfo={displayInfo}
@@ -777,6 +791,8 @@ export default function App() {
           setAnnotations={updateAnnotations}
           mosaicMode={mosaicMode}
           setMosaicMode={setMosaicMode}
+          arrowStyle={arrowStyle}
+          setArrowStyle={setArrowStyle}
           undo={undo}
           clearAll={clearAll}
           canUndo={undoStack.length > 0}
@@ -826,19 +842,8 @@ export default function App() {
           refreshProviders={tm.refreshProviders}
           onClose={closeWithAnimation}
           onMinimize={handleMinimizeChat}
-          onPin={({ screenshotAttached: attached } = {}) => {
-            const panel = document.querySelector('.chat-panel')
-            const bounds = panel ? {
-              x: Math.round(panel.getBoundingClientRect().left),
-              y: Math.round(panel.getBoundingClientRect().top),
-              width: Math.round(panel.getBoundingClientRect().width),
-              height: Math.round(panel.getBoundingClientRect().height),
-            } : null
-            window.electronAPI?.pinChat({
-              thread: tm.currentThread,
-              croppedImage: attached ? croppedImage : null,
-            }, bounds)
-          }}
+          onPin={({ screenshotAttached: attached } = {}) => pinOutFromOverlay({ includeCroppedImage: attached, pinned: true })}
+          onSentWithImage={(threadSnapshot) => pinOutFromOverlay({ pinned: false, threadOverride: threadSnapshot, pendingSend: true })}
           provider={tm.provider}
           setProvider={tm.setProvider}
           modelId={tm.modelId}

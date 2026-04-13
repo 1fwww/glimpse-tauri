@@ -7,6 +7,7 @@ export default function ChatOnlyApp() {
   const [initialContext, setInitialContext] = useState({ text: '', seq: 0 })
   const [isPinned, setIsPinned] = useState(false)
   const [croppedImage, setCroppedImage] = useState(null)
+  const [autoSendPending, setAutoSendPending] = useState(false)
   const tm = useThreadManager()
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function ChatOnlyApp() {
         if (data.croppedImage) setCroppedImage(data.croppedImage)
       }
     })
+    window.electronAPI?.onAutoSend?.(() => setAutoSendPending(true))
   }, [])
 
   const handleClose = () => {
@@ -88,6 +90,8 @@ export default function ChatOnlyApp() {
         initialContext={initialContext}
         isPinned={isPinned}
         onTogglePin={() => window.electronAPI?.togglePin?.()}
+        autoSendPending={autoSendPending}
+        onAutoSendConsumed={() => setAutoSendPending(false)}
       />
       </div>
     </div>

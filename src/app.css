@@ -1652,6 +1652,36 @@
   color: var(--brand);
 }
 
+.edit-arrow-styles {
+  display: flex;
+  gap: 3px;
+}
+
+.edit-arrow-style-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.edit-arrow-style-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.edit-arrow-style-btn.active {
+  background: var(--brand-muted);
+  border-color: var(--border-active);
+  color: var(--brand);
+}
+
 .edit-font-size-select {
   background: var(--surface-input);
   border: 1px solid var(--border-dim);

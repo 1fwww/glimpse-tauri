@@ -104,5 +104,6 @@ if (window.__TAURI_INTERNALS__ && !window.electronAPI) {
     onShortcutTried: (callback) => listen('shortcut-tried', callback),
     onResetOverlay: (callback) => listen('reset-overlay', callback),
     onProvidersChanged: (callback) => listen('providers-changed', callback),
+    onAutoSend: (callback) => listen('auto-send', callback),
   }
 }

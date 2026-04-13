@@ -101,6 +101,9 @@ export default function ChatPanel({
   onClose,
   onMinimize,
   onPin,
+  onSentWithImage,
+  autoSendPending,
+  onAutoSendConsumed,
   isPinned,
   onTogglePin,
   provider,
@@ -152,16 +155,20 @@ export default function ChatPanel({
             return { role: 'assistant', text: (m.content || []).map(c => c.text || '').join(''), model: m.model }
           }
           const rawText = (m.content || []).map(c => c.type === 'text' ? c.text : '').join(' ').trim()
+          const imageBlock = (m.content || []).find(c => c.type === 'image')
+          const image = imageBlock?.source?.data
+            ? `data:${imageBlock.source.media_type || 'image/jpeg'};base64,${imageBlock.source.data}`
+            : null
           // Parse out [Referenced text: "..."] and annotation notes
           const refMatch = rawText.match(/^\[Referenced text: "(.+?)"\]\s*\n*(?:\[Note:.*?\]\s*\n*)?(.*)$/s)
           const annotMatch = rawText.match(/^\[Note:.*?\]\s*\n*(.*)$/s)
           if (refMatch) {
-            return { role: 'user', text: refMatch[2].trim(), snippet: refMatch[1] }
+            return { role: 'user', text: refMatch[2].trim(), snippet: refMatch[1], image }
           }
           if (annotMatch) {
-            return { role: 'user', text: annotMatch[1].trim() }
+            return { role: 'user', text: annotMatch[1].trim(), image }
           }
-          return { role: 'user', text: rawText }
+          return { role: 'user', text: rawText, image }
         }))
         apiMessages.current = [...(currentThread.messages || [])]
       } else {
@@ -184,6 +191,60 @@ export default function ChatPanel({
       }, 50)
     }
   }, [currentThread?.id])
+
+  // Auto-send: overlay pinned out with a pending API call.
+  // The thread data has the user message — just call chatWithAI.
+  // Delay 100ms to ensure thread-loading useEffect has populated apiMessages.
+  useEffect(() => {
+    if (!autoSendPending) return
+    const timer = setTimeout(async () => {
+      if (apiMessages.current.length === 0) return
+      onAutoSendConsumed?.()
+      setIsLoading(true)
+      setTimeout(() => scrollToRevealLoading(), 50)
+      const isFirstMessage = apiMessages.current.length === 1
+      try {
+        const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
+        setIsLoading(false)
+        if (result.success) {
+          const assistantText = result.content.map(c => c.text || '').join('')
+          const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
+          apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
+          setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
+          if (!chatFullSize) setChatFullSize(true)
+          await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
+          scrollToLastAssistant()
+          const now = Date.now()
+          const thread = {
+            id: currentThread?.id || generateId(),
+            title: currentThread?.title || 'New Chat',
+            messages: [...apiMessages.current],
+            createdAt: currentThread?.createdAt || now,
+            updatedAt: now,
+          }
+          await saveCurrentThread(thread)
+          if (isFirstMessage) {
+            const titleMsgs = apiMessages.current.map(m => ({
+              ...m,
+              content: Array.isArray(m.content) ? m.content.filter(c => c.type !== 'image') : m.content,
+            }))
+            const title = await generateTitle(titleMsgs)
+            if (title) {
+              thread.title = title
+              await saveCurrentThread(thread)
+              setIsNewThread(false)
+            }
+          }
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result.error || 'Unknown error'}` }])
+        }
+      } catch (err) {
+        setIsLoading(false)
+        setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${err.message}` }])
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [autoSendPending, currentThread?.id])
 
   // Auto-focus input
   useEffect(() => {
@@ -522,6 +583,18 @@ export default function ChatPanel({
     if (willAttachImage) {
       lastSentImageRef.current = croppedImage
       setScreenshotAttached(false)
+      // Pin out to standalone chat — let IT make the API call
+      if (onSentWithImage) {
+        const now = Date.now()
+        onSentWithImage({
+          id: currentThread?.id || generateId(),
+          title: currentThread?.title || 'New Chat',
+          messages: [...apiMessages.current],
+          createdAt: currentThread?.createdAt || now,
+          updatedAt: now,
+        })
+        return // Don't call API from overlay — standalone will handle it
+      }
     }
 
     const isFirstMessage = apiMessages.current.length === 1
