@@ -549,7 +549,7 @@ export default function App() {
         setSelection(selectionRef.current)
         selectionRef.current = null
       }
-      if (finalSel) cropSelection(finalSel, screenImage, displayInfo, windowOffset)
+      if (finalSel) cropSelection(finalSel, screenImageRef.current, displayInfoRef.current, windowOffsetRef.current)
       return
     }
 
@@ -563,7 +563,7 @@ export default function App() {
         setSelection(selectionRef.current)
         selectionRef.current = null
       }
-      if (finalSel) cropSelection(finalSel, screenImage, displayInfo, windowOffset)
+      if (finalSel) cropSelection(finalSel, screenImageRef.current, displayInfoRef.current, windowOffsetRef.current)
       return
     }
 
@@ -583,7 +583,7 @@ export default function App() {
       setHoveredWindow(null)
       setChatVisible(true)
       setChatMinimized(chatWasOpenRef.current ? false : (userMinimizedRef.current || tm.isNewThread))
-      cropSelection(finalSel, screenImage, displayInfo, windowOffset)
+      cropSelection(finalSel, screenImageRef.current, displayInfoRef.current, windowOffsetRef.current)
       return
     }
 
@@ -596,7 +596,7 @@ export default function App() {
       setHoveredWindow(null)
       setChatVisible(true)
       setChatMinimized(chatWasOpenRef.current ? false : (userMinimizedRef.current || tm.isNewThread))
-      cropSelection(sel, screenImage, displayInfo, windowOffset)
+      cropSelection(sel, screenImageRef.current, displayInfoRef.current, windowOffsetRef.current)
     } else {
       closeWithAnimation()
     }
