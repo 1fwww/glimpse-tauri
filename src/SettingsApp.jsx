@@ -18,6 +18,7 @@ export default function SettingsApp() {
 
   useEffect(() => {
     loadData()
+    window.electronAPI?.settingsReady?.()
   }, [])
 
   const loadData = async () => {
