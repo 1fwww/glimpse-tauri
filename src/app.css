@@ -493,6 +493,12 @@
   font-family: var(--font-display);
 }
 
+/* During drag: kill transform transition + freeze content for GPU-only compositing */
+.chat-panel.panel-dragging {
+  transition: none !important;
+  pointer-events: none;
+}
+
 /* Pinned state — dark theme */
 .chat-panel.pinned-panel {
   background: rgba(22, 21, 30, 0.97);
@@ -574,7 +580,15 @@
   gap: 10px;
   border-bottom: 1px solid var(--border-dim);
   flex-shrink: 0;
+}
+
+/* Grab cursor only in standalone chat (not in overlay where chat is embedded) */
+.chat-only-app .chat-header {
   cursor: grab;
+}
+
+.chat-only-app .chat-header:active {
+  cursor: grabbing;
 }
 
 /* Header eye — hover lifts eyebrow, click does single blink */
@@ -590,10 +604,6 @@
 .logo-single-blink svg path:first-child {
   transform-origin: 260px 230px;
   animation: blinkOnce 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.chat-header:active {
-  cursor: grabbing;
 }
 
 @keyframes dotBreathe {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react'
+import React, { useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react'
 
 const tools = [
   { id: 'rect', label: 'Rectangle', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /></svg> },
@@ -53,6 +53,8 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
 
+  const toolbarRef = useRef(null)
+
   // Position toolbar: below selection → above → inside bottom
   // Avoids overlapping with chat panel
   const position = useMemo(() => {
@@ -61,7 +63,8 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
     const screenW = window.innerWidth
     const screenH = window.innerHeight
     const toolbarH = 44
-    const toolbarW = 500 // tools bar (with close) + AI icon + gap
+    // Measure actual width if rendered, fallback to estimate
+    const toolbarW = toolbarRef.current?.offsetWidth || 500
     const gap = 10
     const notchSafeY = 52
 
@@ -116,6 +119,17 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
     return { left, top }
   }, [selection, chatPos, chatHeight])
 
+  // Re-clamp after render using actual measured width (initial estimate may be off)
+  useLayoutEffect(() => {
+    if (!toolbarRef.current || position.left == null) return
+    const actual = toolbarRef.current.offsetWidth
+    const screenW = window.innerWidth
+    const maxLeft = screenW - actual - 8
+    if (position.left > maxLeft) {
+      toolbarRef.current.style.left = Math.max(8, maxLeft) + 'px'
+    }
+  }, [position])
+
   const handleToolbarMouseDown = (e) => {
     // Don't drag when clicking buttons
     if (e.target.closest('button')) {
@@ -146,6 +160,7 @@ export default function EditToolbar({ selection, chatPos, chatHeight, activeTool
 
   return (
     <div
+      ref={toolbarRef}
       className="edit-toolbar"
       style={{
         left: position.left,

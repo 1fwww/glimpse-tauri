@@ -626,10 +626,13 @@ export default function ChatPanel({
   const triggerTitleAnim = () => setTitleAnim(k => k + 1)
 
 
-  // Draggable panel
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  // Draggable panel — use refs + direct DOM + rAF for smooth 60fps (no React re-render)
+  const dragOffsetRef = useRef({ x: 0, y: 0 })
+  const panelRef = useRef(null)
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
+  const dragRaf = useRef(null)
+  const dragPending = useRef({ x: 0, y: 0 })
 
   // Resizable panel
   const [sizeOffset, setSizeOffset] = useState({ w: 0, h: 0 })
@@ -649,17 +652,34 @@ export default function ChatPanel({
       return
     }
     isDragging.current = true
-    dragStart.current = { x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y }
+    dragStart.current = { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y }
+    // Promote to GPU layer + disable content interaction for smooth dragging
+    if (panelRef.current) {
+      panelRef.current.style.willChange = 'transform'
+      panelRef.current.classList.add('panel-dragging')
+    }
 
     const handleMouseMove = (ev) => {
       if (!isDragging.current) return
-      setDragOffset({
-        x: ev.clientX - dragStart.current.x,
-        y: ev.clientY - dragStart.current.y,
-      })
+      dragPending.current = { x: ev.clientX - dragStart.current.x, y: ev.clientY - dragStart.current.y }
+      if (!dragRaf.current) {
+        dragRaf.current = requestAnimationFrame(() => {
+          dragRaf.current = null
+          const { x, y } = dragPending.current
+          dragOffsetRef.current = { x, y }
+          if (panelRef.current) {
+            panelRef.current.style.transform = `translate(${x}px, ${y}px)`
+          }
+        })
+      }
     }
     const handleMouseUp = () => {
       isDragging.current = false
+      if (dragRaf.current) { cancelAnimationFrame(dragRaf.current); dragRaf.current = null }
+      if (panelRef.current) {
+        panelRef.current.style.willChange = ''
+        panelRef.current.classList.remove('panel-dragging')
+      }
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
@@ -703,11 +723,12 @@ export default function ChatPanel({
     ...style,
     width: 380 + sizeOffset.w,
     height: (style.height || 320) + sizeOffset.h,
-    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
+    transform: `translate(${dragOffsetRef.current.x}px, ${dragOffsetRef.current.y}px)`,
   }
 
   return (
     <div
+      ref={panelRef}
       className={`chat-panel ${isNewThread ? 'chat-panel-new' : ''} ${isPinned ? 'chat-panel-pinned pinned-panel' : ''}`}
       style={panelStyle}
       onMouseDown={(e) => e.stopPropagation()}
