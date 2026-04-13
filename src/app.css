@@ -476,7 +476,7 @@
   z-index: 8000;
   width: 380px;
   background: var(--surface-panel);
-  border: 1px solid var(--border-dim);
+  border: none;
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
@@ -484,13 +484,25 @@
   cursor: default;
   transition:
     max-height 350ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.45s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
     backdrop-filter 0.45s cubic-bezier(0.22, 1, 0.36, 1),
     background 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-  box-shadow: var(--shadow-lg);
+  /* Match .chat-only-inner / .settings-inner: 0.5px ring + shadow for depth */
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.15);
   font-family: var(--font-display);
+}
+
+.theme-light .chat-panel {
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.7),
+    0 8px 28px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
 /* During drag: kill transform transition + freeze content for GPU-only compositing */
