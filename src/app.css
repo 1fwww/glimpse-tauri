@@ -1025,6 +1025,14 @@
   margin-left: auto;
   border: 1px solid var(--border-dim);
 }
+.msg-image-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.msg-image-clickable:hover {
+  border-color: var(--brand-border);
+  transform: scale(1.03);
+}
 
 .input-attachment-cue {
   display: flex;

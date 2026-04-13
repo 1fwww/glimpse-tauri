@@ -128,6 +128,17 @@ export default function ChatPanel({
     setTextContext(initialContext?.text || '')
   }, [initialContext?.seq])
 
+  // Strip file-referenced images for AI API calls — replace with text placeholder.
+  // apiMessages.current keeps file refs (for saving), this is only for the API.
+  const getApiSafeMessages = () => apiMessages.current.map(m => ({
+    ...m,
+    content: (m.content || []).map(c =>
+      (c.type === 'image' && c.source?.type === 'file')
+        ? { type: 'text', text: '[screenshot]' }
+        : c
+    ),
+  }))
+
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState([])
   const [screenshotAttached, setScreenshotAttached] = useState(true)
@@ -156,20 +167,28 @@ export default function ChatPanel({
           }
           const rawText = (m.content || []).map(c => c.type === 'text' ? c.text : '').join(' ').trim()
           const imageBlock = (m.content || []).find(c => c.type === 'image')
-          const image = imageBlock?.source?.data
-            ? `data:${imageBlock.source.media_type || 'image/jpeg'};base64,${imageBlock.source.data}`
-            : null
+          let image = null
+          let imagePath = null  // relative path for image viewer IPC
+          if (imageBlock?.source?.type === 'file' && imageBlock.source.path) {
+            imagePath = imageBlock.source.path
+            const fullPath = `${window._glimpseAppSupportDir}/${imageBlock.source.path}`
+            image = 'file://' + fullPath.split('/').map(s => encodeURIComponent(s)).join('/')
+          } else if (imageBlock?.source?.data) {
+            image = `data:${imageBlock.source.media_type || 'image/jpeg'};base64,${imageBlock.source.data}`
+          }
           // Parse out [Referenced text: "..."] and annotation notes
           const refMatch = rawText.match(/^\[Referenced text: "(.+?)"\]\s*\n*(?:\[Note:.*?\]\s*\n*)?(.*)$/s)
           const annotMatch = rawText.match(/^\[Note:.*?\]\s*\n*(.*)$/s)
           if (refMatch) {
-            return { role: 'user', text: refMatch[2].trim(), snippet: refMatch[1], image }
+            return { role: 'user', text: refMatch[2].trim(), snippet: refMatch[1], image, imagePath }
           }
           if (annotMatch) {
-            return { role: 'user', text: annotMatch[1].trim(), image }
+            return { role: 'user', text: annotMatch[1].trim(), image, imagePath }
           }
-          return { role: 'user', text: rawText, image }
+          return { role: 'user', text: rawText, image, imagePath }
         }))
+        // Keep file references in apiMessages — they're needed for saving back to disk.
+        // File images are stripped only at the point of sending to the AI API.
         apiMessages.current = [...(currentThread.messages || [])]
       } else {
         setMessages([])
@@ -182,15 +201,17 @@ export default function ChatPanel({
     }
     prevThreadIdRef.current = newId
 
-    // Scroll to bottom when switching to an existing thread, but NOT when a new
-    // thread just received its first ID — scrollToLastAssistant handles that case
-    if (!isNewThreadGettingId) {
+    // Scroll to bottom only when switching to a DIFFERENT thread (ID changed).
+    // Same-thread message additions (e.g., saveCurrentThread) should NOT scroll —
+    // scrollToLastAssistant handles positioning after AI responds.
+    const threadIdChanged = prevId !== newId
+    if (!isNewThreadGettingId && threadIdChanged) {
       setIsAtBottom(true)
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
       }, 50)
     }
-  }, [currentThread?.id])
+  }, [currentThread?.id, currentThread?.messages?.length])
 
   // Auto-send: overlay pinned out with a pending API call.
   // The thread data has the user message — just call chatWithAI.
@@ -204,7 +225,7 @@ export default function ChatPanel({
       setTimeout(() => scrollToRevealLoading(), 50)
       const isFirstMessage = apiMessages.current.length === 1
       try {
-        const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
+        const result = await window.electronAPI.chatWithAI(getApiSafeMessages(), provider, modelId)
         setIsLoading(false)
         if (result.success) {
           const assistantText = result.content.map(c => c.text || '').join('')
@@ -358,7 +379,7 @@ export default function ChatPanel({
       setTimeout(() => scrollToRevealLoading(), 50)
       ;(async () => {
         try {
-          const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
+          const result = await window.electronAPI.chatWithAI(getApiSafeMessages(), provider, modelId)
           setIsLoading(false)
           if (!result?.success) {
             if (result?.code === 'auth_error' || result?.error?.includes('No API key')) {
@@ -448,45 +469,77 @@ export default function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
+  // Wait for all message images to load + layout to settle before measuring for scroll.
+  // Data URL images may report complete=true before layout; double rAF ensures paint.
+  const whenLayoutStable = useCallback((fn) => {
+    const el = messagesContainerRef.current
+    if (!el) { fn(); return }
+    const images = el.querySelectorAll('img.msg-image')
+    const unloaded = [...images].filter(img => !img.complete)
+    const afterLayout = () => requestAnimationFrame(() => requestAnimationFrame(fn))
+    if (unloaded.length) {
+      Promise.all(unloaded.map(img => new Promise(r => { img.onload = r; img.onerror = r })))
+        .then(afterLayout)
+    } else {
+      afterLayout()
+    }
+  }, [])
+
   const scrollToLastAssistant = useCallback(() => {
     if (!lastAssistantRef.current || !messagesContainerRef.current) return
     const el = messagesContainerRef.current
     el.scrollTop = 0
-    requestAnimationFrame(() => {
+    whenLayoutStable(() => {
       if (!lastAssistantRef.current) return
       const msgRect = lastAssistantRef.current.getBoundingClientRect()
       const containerRect = el.getBoundingClientRect()
       el.scrollTop = msgRect.top - containerRect.top
     })
-  }, [])
+  }, [whenLayoutStable])
 
   // Scroll so the loading indicator ("Glimpsing...") is just visible at the bottom
   const scrollToRevealLoading = useCallback(() => {
     if (!lastAssistantRef.current || !messagesContainerRef.current) return
     const el = messagesContainerRef.current
     el.scrollTop = 0
-    requestAnimationFrame(() => {
+    whenLayoutStable(() => {
       if (!lastAssistantRef.current) return
       const msgRect = lastAssistantRef.current.getBoundingClientRect()
       const containerRect = el.getBoundingClientRect()
       const targetScroll = msgRect.top - containerRect.top - containerRect.height + msgRect.height + 40
       el.scrollTop = Math.max(0, targetScroll)
     })
-  }, [])
+  }, [whenLayoutStable])
 
   const saveCurrentThread = useCallback(async (thread) => {
     setCurrentThread(thread)
-    await window.electronAPI?.saveThread({
-      ...thread,
-      messages: thread.messages.map(m => ({
-        ...m,
-        content: m.content.map(c =>
-          c.type === 'image' ? { type: 'text', text: '[screenshot]' } : c
-        ),
+
+    // Save images to disk and replace base64 blocks with file references
+    const savedMessages = await Promise.all(thread.messages.map(async (m, idx) => ({
+      ...m,
+      content: await Promise.all(m.content.map(async (c) => {
+        if (c.type === 'image' && c.source?.type === 'base64') {
+          const result = await window.electronAPI?.saveThreadImage(
+            thread.id, idx, c.source.data, c.source.media_type
+          )
+          if (result?.success) {
+            return { type: 'image', source: { type: 'file', path: result.path, media_type: c.source.media_type } }
+          }
+          return { type: 'text', text: '[screenshot]' } // fallback
+        }
+        return c // file references and text blocks pass through
       })),
-    })
+    })))
+
+    await window.electronAPI?.saveThread({ ...thread, messages: savedMessages })
+
+    // apiMessages.current keeps file refs intact (source of truth for saving + display).
+    // File images are only stripped to [screenshot] at the point of chatWithAI() calls
+    // via getApiSafeMessages(). saveImage() is idempotent (overwrites same file).
+
+    refreshThreads()
     window.electronAPI?.refreshTrayMenu?.()
-  }, [setCurrentThread])
+  }, [setCurrentThread, refreshThreads])
 
   const generateTitle = useCallback(async (msgs) => {
     if (!window.electronAPI?.generateTitle) return null
@@ -584,13 +637,15 @@ export default function ChatPanel({
     if (willAttachImage) {
       lastSentImageRef.current = croppedImage
       setScreenshotAttached(false)
-      // Pin out to standalone chat — let IT make the API call
+      // Pin out to standalone chat — let IT make the API call.
+      // Send currentThread.messages (preserves file refs for UI thumbnails)
+      // plus the new user message.
       if (onSentWithImage) {
         const now = Date.now()
         onSentWithImage({
           id: currentThread?.id || generateId(),
           title: currentThread?.title || 'New Chat',
-          messages: [...apiMessages.current],
+          messages: [...(currentThread?.messages || []), userApiMsg],
           createdAt: currentThread?.createdAt || now,
           updatedAt: now,
         })
@@ -601,7 +656,7 @@ export default function ChatPanel({
     const isFirstMessage = apiMessages.current.length === 1
 
     try {
-      const result = await window.electronAPI.chatWithAI(apiMessages.current, provider, modelId)
+      const result = await window.electronAPI.chatWithAI(getApiSafeMessages(), provider, modelId)
 
       // Hide loading dots before adding the response
       setIsLoading(false)
@@ -1047,7 +1102,15 @@ export default function ChatPanel({
                     ) : (
                       <>
                         {msg.image && (
-                          <img src={msg.image} alt="screenshot" className="msg-image" />
+                          <img
+                            src={msg.image}
+                            alt="screenshot"
+                            className="msg-image msg-image-clickable"
+                            onClick={() => {
+                              if (msg.imagePath) window.electronAPI?.showImageViewer?.(msg.imagePath)
+                              else if (msg.image) window.electronAPI?.showImageViewerData?.(msg.image)
+                            }}
+                          />
                         )}
                         {msg.snippet && (
                           <ExpandableSnippet text={msg.snippet} />

@@ -99,11 +99,15 @@ export default function App() {
       setActiveTool(null)
     }
 
-    const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset, preSelection, keepThread, wasNewThread) => {
-      if (keepThread) {
-        resetStateKeepThread()
-      } else {
+    const removeScreenCaptured = window.electronAPI.onScreenCaptured((dataUrl, bounds, dispInfo, offset, preSelection, startNewThread, compact) => {
+      // Swift decides thread state — JS just executes
+      if (startNewThread) {
         resetState()
+        tm.handleNewThread()
+      } else {
+        resetStateKeepThread()
+        // Reload latest thread from disk — may have been updated by standalone chat
+        tm.loadLatestThread()
       }
       setScreenImage(dataUrl)
       screenImageRef.current = dataUrl
@@ -123,19 +127,18 @@ export default function App() {
         setSelection(preSelection)
         setIsSelecting(false)
         setChatVisible(true)
-        if (keepThread && !wasNewThread) {
-          // Continuing existing conversation — preserve expand state
-          setChatMinimized(userMinimizedRef.current)
-        } else {
-          // New thread (stale, fresh, or "+" was clicked) — compact
+        if (compact) {
+          // New thread — compact
           setChatMinimized(true)
           setChatFullSize(false)
+        } else {
+          // Continuing existing conversation — expanded, preserve minimize state
+          setChatMinimized(userMinimizedRef.current)
+          setChatFullSize(true)
         }
         setTimeout(() => cropSelection(preSelection, dataUrl, dispInfo, offset), 50)
       }
       // Signal Swift after React renders + image decodes.
-      // 50ms lets React batch + flush state updates (synchronous, typically <20ms).
-      // Then preload the image to ensure it's decoded in memory.
       setTimeout(() => {
         const img = new Image()
         img.onload = () => window.electronAPI?.overlayRendered?.()
@@ -143,7 +146,6 @@ export default function App() {
         img.src = dataUrl
       }, 50)
       window.focus()
-      if (!keepThread) tm.refreshWithHeuristic()
     })
 
     const removeNewCapture = window.electronAPI.onNewCapture((dataUrl, dispInfo) => {

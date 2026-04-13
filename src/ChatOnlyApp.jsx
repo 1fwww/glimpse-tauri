@@ -16,9 +16,7 @@ export default function ChatOnlyApp() {
     window.electronAPI?.onPinState?.((state) => setIsPinned(state))
     window.electronAPI?.onSetCroppedImage?.((img) => setCroppedImage(img))
     window.electronAPI?.onClearScreenshot?.(() => setCroppedImage(null))
-    // Chat shown — re-evaluate thread (5min heuristic) and resize accordingly
-    window.electronAPI?.onCheckSize?.(() => tm.refreshOnShow())
-    // Stale chat — Swift determined >5min elapsed, start fresh (lightweight, no re-render)
+    // Swift decides thread state via decideChatState() — emits start-new-thread if needed
     window.electronAPI?.onStartNewThread?.(() => tm.handleNewThread())
     // Receive full thread data from pin (no disk read needed)
     window.electronAPI?.onLoadThreadData?.((data) => {
