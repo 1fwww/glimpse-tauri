@@ -44,6 +44,8 @@ export default function useThreadManager() {
         if (mostRecent) {
           setCurrentThread(mostRecent)
           setIsNewThread(false)
+          // Notify Swift that an existing thread loaded — clears wasNewThread
+          window.electronAPI?.notifyThreadLoaded?.()
         } else {
           setCurrentThread(newThread())
           setIsNewThread(true)
@@ -91,9 +93,8 @@ export default function useThreadManager() {
       setRecentThreads(threads || [])
       const mostRecent = threads?.[0]
       if (mostRecent) {
-        if (currentThreadRef.current?.id !== mostRecent.id) {
-          setCurrentThread(mostRecent)
-        }
+        // Always update — thread may have new messages from standalone chat
+        setCurrentThread(mostRecent)
         setIsNewThread(false)
       } else {
         setCurrentThread(newThread())

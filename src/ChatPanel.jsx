@@ -246,7 +246,7 @@ export default function ChatPanel({
   useEffect(() => {
     if (!autoSendPending) return
     const timer = setTimeout(async () => {
-      if (apiMessages.current.length === 0) return
+      if (apiMessages.current.length === 0) { return }
       onAutoSendConsumed?.()
       setIsLoading(true)
       setTimeout(() => scrollToRevealLoading(), 50)
@@ -808,7 +808,6 @@ export default function ChatPanel({
           createdAt: currentThread?.createdAt || now,
           updatedAt: now,
         }
-
         await saveCurrentThread(thread)
 
         if (isFirstMessage) {
@@ -1031,7 +1030,7 @@ export default function ChatPanel({
               <div className="thread-menu-popup header-popup" role="menu" aria-label="Thread history">
                 {recentThreads.filter(t => t.id !== currentThread?.id).length > 0 ? (
                   <>
-                    {recentThreads.filter(t => t.id !== currentThread?.id).slice(0, 3).map(t => (
+                    {recentThreads.filter(t => t.id !== currentThread?.id).map(t => (
                       <button key={t.id} className="thread-menu-item" role="menuitem" onClick={() => { onThreadChange(t); setThreadMenuOpen(false); triggerTitleAnim() }} title={t.title}>
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                         <span>{t.title}</span>
@@ -1258,8 +1257,18 @@ export default function ChatPanel({
                             alt="screenshot"
                             className="msg-image msg-image-clickable"
                             onClick={() => {
-                              if (msg.imagePath) window.electronAPI?.showImageViewer?.(msg.imagePath)
-                              else if (msg.image) window.electronAPI?.showImageViewerData?.(msg.image)
+                              // Collect all images in thread for arrow-key navigation
+                              const allImages = messages.filter(m => m.image).map(m => ({
+                                path: m.imagePath || null,
+                                dataUrl: (!m.imagePath && m.image) ? m.image : null
+                              }))
+                              const currentIndex = messages.filter(m => m.image).findIndex(m => m === msg)
+                              window.electronAPI?.showImageViewer?.(
+                                msg.imagePath || null,
+                                (!msg.imagePath && msg.image) ? msg.image : null,
+                                allImages,
+                                currentIndex
+                              )
                             }}
                           />
                         )}

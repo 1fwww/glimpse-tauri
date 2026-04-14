@@ -44,7 +44,7 @@ export default function ChatOnlyApp() {
         if (data.croppedImage) setCroppedImage(data.croppedImage)
       }
     })
-    window.electronAPI?.onAutoSend?.(() => setAutoSendPending(true))
+    window.electronAPI?.onAutoSend?.(() => { setAutoSendPending(true) })
     // Listen to window blur — focus does NOT reset blur state.
     // Only expand button or unpin resets it (via onExitViewMode).
     const handleBlur = () => { if (isPinnedRef.current) setIsWindowBlurred(true) }
