@@ -642,11 +642,14 @@ export default function App() {
     const panel = document.querySelector('.chat-panel')
     const r = panel?.getBoundingClientRect()
     const bounds = r ? { x: r.left, y: r.top, width: r.width, height: r.height } : null
+    const messagesEl = panel?.querySelector('.chat-messages')
+    const scrollTop = messagesEl?.scrollTop ?? null
     window.electronAPI?.pinChat({
       thread: threadOverride || tm.currentThread,
       croppedImage: includeCroppedImage ? croppedImage : null,
       pinned,
       pendingSend,
+      scrollTop,
     }, bounds)
   }, [tm.currentThread, croppedImage])
 

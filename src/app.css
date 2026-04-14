@@ -423,6 +423,102 @@
   border-top-color: transparent;
 }
 
+/* ─── View Mode (scroll-driven fade when pinned + blurred) ─── */
+
+/* Opacity set inline by JS based on scroll accumulation */
+.chat-bottom-zone {
+  flex-shrink: 0;
+}
+
+
+/* Eye + pin overlay — gradient fade from panel bg at top edge */
+.view-mode-header-icons {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 20px;
+  z-index: 10;
+  background: linear-gradient(
+    to bottom,
+    rgba(34, 33, 49, 0.7) 0%,
+    rgba(108, 99, 255, 0.04) 60%,
+    transparent 100%
+  );
+}
+
+.theme-light .view-mode-header-icons {
+  background: linear-gradient(
+    to bottom,
+    rgba(230, 228, 240, 0.7) 0%,
+    rgba(108, 99, 255, 0.03) 60%,
+    transparent 100%
+  );
+}
+
+.view-mode-header-icons > * {
+  pointer-events: auto;
+}
+
+/* Bottom area — subtle gradient for drag + pill */
+.view-mode-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 12px 10px;
+  z-index: 10;
+  background: linear-gradient(
+    to top,
+    rgba(34, 33, 49, 0.7) 0%,
+    rgba(108, 99, 255, 0.04) 60%,
+    transparent 100%
+  );
+}
+
+.theme-light .view-mode-bottom {
+  background: linear-gradient(
+    to top,
+    rgba(230, 228, 240, 0.7) 0%,
+    rgba(108, 99, 255, 0.03) 60%,
+    transparent 100%
+  );
+}
+
+/* Minimized input pill — inside bottom bar */
+.view-mode-pill {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-dim);
+  background: var(--surface-input);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: inherit;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.view-mode-pill:hover {
+  border-color: var(--brand-border);
+  box-shadow: 0 0 0 2px var(--brand-dim);
+}
+
+.theme-light .view-mode-pill {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+
 .chat-only-app .chat-header {
   -webkit-app-region: drag;
 }

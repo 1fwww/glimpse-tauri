@@ -105,6 +105,9 @@ export default function ChatPanel({
   autoSendPending,
   onAutoSendConsumed,
   isPinned,
+  isWindowBlurred,
+  onExitViewMode,
+  skipNextScrollRef,
   onTogglePin,
   provider,
   setProvider,
@@ -143,6 +146,13 @@ export default function ChatPanel({
   const [messages, setMessages] = useState([])
   const [screenshotAttached, setScreenshotAttached] = useState(true)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const bottomZoneRef = useRef(null)
+  // Scroll-driven view mode: chrome fades as user scrolls while pinned+blurred
+  const scrollAccum = useRef(0)
+  const lastScrollTop = useRef(0)
+  const headerRef = useRef(null)
+  const viewModeActiveRef = useRef(false)
+  const chromeHeights = useRef({ header: 0, bottom: 0 })
   const messagesEndRef = useRef(null)
   const lastAssistantRef = useRef(null)
   const messagesContainerRef = useRef(null)
@@ -206,10 +216,27 @@ export default function ChatPanel({
     // scrollToLastAssistant handles positioning after AI responds.
     const threadIdChanged = prevId !== newId
     if (!isNewThreadGettingId && threadIdChanged) {
-      setIsAtBottom(true)
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-      }, 50)
+      // Restore scroll position from overlay, or scroll to bottom for new threads
+      if (skipNextScrollRef?.current !== undefined && skipNextScrollRef?.current !== false) {
+        const savedScrollTop = skipNextScrollRef.current
+        skipNextScrollRef.current = false
+        // Restore the exact scroll position from the overlay chat
+        if (typeof savedScrollTop === 'number') {
+          setTimeout(() => {
+            whenLayoutStable(() => {
+              const el = messagesContainerRef.current
+              if (el) el.scrollTop = savedScrollTop
+            })
+          }, 50)
+        }
+      } else {
+        setIsAtBottom(true)
+        setTimeout(() => {
+          whenLayoutStable(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+          })
+        }, 50)
+      }
     }
   }, [currentThread?.id, currentThread?.messages?.length])
 
@@ -275,7 +302,10 @@ export default function ChatPanel({
     const handleFocus = () => {
       setThreadMenuOpen(false)
       setModelMenuOpen(false)
-      setTimeout(() => inputRef.current?.focus(), 50)
+      // Don't auto-focus input when view mode is active (chrome is hidden)
+      if (!viewModeActiveRef.current) {
+        setTimeout(() => inputRef.current?.focus(), 50)
+      }
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
@@ -456,7 +486,11 @@ export default function ChatPanel({
     }
   }, [showWelcome])
 
-  // Track scroll position
+  // Track scroll position (always active)
+  const expandBtnRef = useRef(null)
+  const headerIconsRef = useRef(null)
+  const scrollDownBtnRef = useRef(null)
+
   const handleScroll = useCallback(() => {
     const el = messagesContainerRef.current
     if (!el) return
@@ -465,9 +499,103 @@ export default function ChatPanel({
     setIsAtBottom(atBottom)
   }, [])
 
+  // Scroll-driven view mode via wheel event (fires on non-key windows).
+  // Only when pinned + window blurred.
+  useEffect(() => {
+    if (!isPinned) return
+    const panel = panelRef.current
+    if (!panel) return
+
+    const handleWheel = (e) => {
+      if (!isWindowBlurred || viewModeActiveRef.current) return
+      const delta = Math.abs(e.deltaY)
+      if (delta < 1) return
+
+      // Measure heights once on first wheel
+      if (!chromeHeights.current.header && headerRef.current && bottomZoneRef.current) {
+        chromeHeights.current.header = headerRef.current.offsetHeight
+        chromeHeights.current.bottom = bottomZoneRef.current.offsetHeight
+      }
+
+      const hH = chromeHeights.current.header
+      const bH = chromeHeights.current.bottom
+      if (!hH || !bH) return
+
+      scrollAccum.current = Math.min(scrollAccum.current + delta, 80)
+      const progress = Math.min(scrollAccum.current / 80, 1)
+
+      // Hide scroll-to-bottom button during slide
+      if (scrollDownBtnRef.current) scrollDownBtnRef.current.style.display = 'none'
+
+      const hdr = headerRef.current
+      const btm = bottomZoneRef.current
+      if (hdr) {
+        const slide = progress * hH
+        hdr.style.transform = `translateY(${-slide}px)`
+        hdr.style.marginBottom = `${-slide}px`
+        hdr.style.opacity = String(1 - progress)
+        hdr.style.pointerEvents = 'none'
+      }
+      if (btm) {
+        const slide = progress * bH
+        btm.style.transform = `translateY(${slide}px)`
+        btm.style.marginTop = `${-slide}px`
+        btm.style.opacity = String(1 - progress)
+        btm.style.pointerEvents = 'none'
+      }
+
+      if (progress >= 1) {
+        viewModeActiveRef.current = true
+        if (expandBtnRef.current) expandBtnRef.current.style.display = ''
+        if (headerIconsRef.current) headerIconsRef.current.style.display = ''
+        // Extra padding so messages aren't hidden behind gradient edges
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.style.paddingTop = '48px'
+          messagesContainerRef.current.style.paddingBottom = '40px'
+        }
+      }
+    }
+
+    panel.addEventListener('wheel', handleWheel, { passive: true })
+    return () => panel.removeEventListener('wheel', handleWheel)
+  }, [isPinned, isWindowBlurred])
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
+
+  // Reset on unpin or expand button click
+  const resetViewMode = useCallback(() => {
+    const wasActive = viewModeActiveRef.current
+    scrollAccum.current = 0
+    lastScrollTop.current = messagesContainerRef.current?.scrollTop || 0
+    viewModeActiveRef.current = false
+    chromeHeights.current = { header: 0, bottom: 0 }
+    if (headerRef.current) headerRef.current.style.cssText = ''
+    if (bottomZoneRef.current) bottomZoneRef.current.style.cssText = ''
+    if (expandBtnRef.current) expandBtnRef.current.style.display = 'none'
+    if (headerIconsRef.current) headerIconsRef.current.style.display = 'none'
+    if (scrollDownBtnRef.current) scrollDownBtnRef.current.style.display = ''
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.style.paddingTop = ''
+      messagesContainerRef.current.style.paddingBottom = ''
+    }
+    if (wasActive) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        inputRef.current?.focus()
+      }, 100)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isPinned) resetViewMode()
+  }, [isPinned])
+
+  const handleViewHintClick = useCallback(() => {
+    resetViewMode()
+    onExitViewMode?.()
+  }, [onExitViewMode, resetViewMode])
 
   // Wait for all message images to load + layout to settle before measuring for scroll.
   // Data URL images may report complete=true before layout; double rAF ensures paint.
@@ -748,7 +876,7 @@ export default function ChatPanel({
   }
 
   const threadTitle = currentThread?.title || 'New Chat'
-  const showScrollDown = !isAtBottom && !isLoading
+  const showScrollDown = !isAtBottom && !isLoading && !viewModeActiveRef.current
   const [eyebrowWiggle, setEyebrowWiggle] = useState(false)
   const [eyeAnim, setEyeAnim] = useState('') // 'blink' | 'draw' | ''
   const [titleAnim, setTitleAnim] = useState(0)
@@ -869,7 +997,7 @@ export default function ChatPanel({
       <div className="panel-resize-edge bottom" onMouseDown={handleResizeMouseDown('bottom')} />
 
       {/* Header — drag handle */}
-      <div className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
+      <div ref={headerRef} className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
         <span
             className={`glimpse-icon-fixed chat-header-eye ${eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-single-blink' : ''}`}
             onClick={(e) => {
@@ -957,6 +1085,29 @@ export default function ChatPanel({
           </>
         )}
       </div>
+
+      {/* Floating eye + pin in view mode (header slides away) */}
+      {isPinned && (
+        <div ref={headerIconsRef} className="view-mode-header-icons" style={{ display: 'none' }}>
+          <span className="glimpse-icon-fixed chat-header-eye">
+            <GlimpseIcon size={24} focused={true} />
+          </span>
+          {(onTogglePin || onPin) && (
+            <button
+              className={`chat-header-pin pinned`}
+              onClick={() => {
+                const handler = onTogglePin || (() => onPin({ screenshotAttached }))
+                handler()
+              }}
+              aria-label="Unpin"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 17v5" /><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="chat-messages-wrapper">
@@ -1145,6 +1296,7 @@ export default function ChatPanel({
             {/* Scroll to bottom arrow */}
             {showScrollDown && (
               <button
+                ref={scrollDownBtnRef}
                 className="scroll-to-bottom"
                 onClick={scrollToBottom}
               >
@@ -1157,6 +1309,11 @@ export default function ChatPanel({
         )}
         </div>
 
+      {/* Bottom zone: input + actions — collapses in view mode */}
+      <div
+        ref={bottomZoneRef}
+        className="chat-bottom-zone"
+      >
       {/* Input */}
       <div className="chat-input-area">
         <div className="chat-input-box">
@@ -1168,7 +1325,14 @@ export default function ChatPanel({
               </svg>
               <span>Screenshot attached</span>
               {onDismissScreenshot && (
-                <button className="attachment-dismiss" onClick={() => { onDismissScreenshot(); setTimeout(() => inputRef.current?.focus(), 50) }} aria-label="Remove screenshot">×</button>
+                <button className="attachment-dismiss" onClick={() => {
+                  const el = messagesContainerRef.current
+                  const prevTop = el?.scrollTop
+                  onDismissScreenshot()
+                  // Restore scroll position after attachment cue removal shrinks input area
+                  if (el && prevTop != null) requestAnimationFrame(() => { el.scrollTop = prevTop })
+                  setTimeout(() => inputRef.current?.focus(), 50)
+                }} aria-label="Remove screenshot">×</button>
               )}
             </div>
           )}
@@ -1278,6 +1442,20 @@ export default function ChatPanel({
           return <span className="thread-action-model">{displayName}</span>
         })()}
       </div>
+      </div>{/* end .chat-bottom-zone */}
+
+      {/* Bottom frosted bar with pill — visible in view mode */}
+      {isPinned && (
+        <div ref={expandBtnRef} className="view-mode-bottom" style={{ display: 'none' }}>
+          <button
+            className="view-mode-pill"
+            onClick={handleViewHintClick}
+            aria-label="Show input"
+          >
+            Continue discussion...
+          </button>
+        </div>
+      )}
     </div>
   )
 }
