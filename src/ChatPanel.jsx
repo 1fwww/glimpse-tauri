@@ -7,6 +7,15 @@ import ApiKeySetup from './ApiKeySetup'
 const BROW_RESTING = "M98 212C152 174 365 158 420 248"
 const BROW_FOCUSED = "M98 192C200 192 350 204 420 234"
 
+const BoardIcon = ({ size = 24 }) => (
+  <svg viewBox="0 0 100 100" width={size} height={size}>
+    <rect x="8" y="8" width="38" height="38" rx="6" fill="none" stroke="currentColor" strokeWidth="5" />
+    <rect x="54" y="8" width="38" height="38" rx="6" fill="none" stroke="currentColor" strokeWidth="5" />
+    <rect x="8" y="54" width="38" height="38" rx="6" fill="none" stroke="currentColor" strokeWidth="5" />
+    <rect x="54" y="54" width="38" height="38" rx="6" fill="none" stroke="currentColor" strokeWidth="5" />
+  </svg>
+)
+
 const GlimpseIcon = ({ size = 20, focused = false }) => (
   <svg viewBox="60 140 420 280" width={size} height={Math.round(size * 280 / 420)}>
     {/* Eyebrow — crossfade between resting and focused */}
@@ -108,6 +117,9 @@ export default function ChatPanel({
   isWindowBlurred,
   onExitViewMode,
   skipNextScrollRef,
+  onToggleBoard,
+  onViewAllChats,
+  boardActive,
   onTogglePin,
   provider,
   setProvider,
@@ -156,17 +168,30 @@ export default function ChatPanel({
   const messagesEndRef = useRef(null)
   const lastAssistantRef = useRef(null)
   const messagesContainerRef = useRef(null)
+  const suppressScrollHandler = useRef(false)
   const inputRef = useRef(null)
   const modelSelectorRef = useRef(null)
   const apiMessages = useRef([])
   const lastSentImageRef = useRef(null)
   const prevThreadIdRef = useRef(null)
+  // Always reflects the LATEST thread ID — survives async awaits unlike closure values
+  const currentThreadIdRef = useRef(currentThread?.id || null)
+  currentThreadIdRef.current = currentThread?.id || null
+  // Set by thread-switch response handler to force reload on navigate-back
+  const forceReloadRef = useRef(false)
 
   // Load messages from current thread
   useEffect(() => {
     const prevId = prevThreadIdRef.current
     const newId = currentThread?.id
-    const isNewThreadGettingId = prevId === null && newId && apiMessages.current.length > 0
+    const isNewThreadGettingId = prevId === null && newId && apiMessages.current.length > 0 && !forceReloadRef.current
+    forceReloadRef.current = false
+
+    // Always clear loading when switching to a different thread —
+    // "Glimpsing..." must never follow across threads.
+    if (!isNewThreadGettingId && prevId !== newId) {
+      setIsLoading(false)
+    }
 
     // Skip reload when a new thread just gets its first ID (preserve in-session images)
     if (!isNewThreadGettingId) {
@@ -215,84 +240,66 @@ export default function ChatPanel({
     // Same-thread message additions (e.g., saveCurrentThread) should NOT scroll —
     // scrollToLastAssistant handles positioning after AI responds.
     const threadIdChanged = prevId !== newId
-    if (!isNewThreadGettingId && threadIdChanged) {
-      // Restore scroll position from overlay, or scroll to bottom for new threads
-      if (skipNextScrollRef?.current !== undefined && skipNextScrollRef?.current !== false) {
-        const savedScrollTop = skipNextScrollRef.current
-        skipNextScrollRef.current = false
-        // Restore the exact scroll position from the overlay chat
-        if (typeof savedScrollTop === 'number') {
-          setTimeout(() => {
-            whenLayoutStable(() => {
-              const el = messagesContainerRef.current
-              if (el) el.scrollTop = savedScrollTop
-            })
-          }, 50)
-        }
-      } else {
-        setIsAtBottom(true)
+
+    // Check for pending scroll restore from overlay pin-out (even if thread ID unchanged)
+    if (skipNextScrollRef?.current !== undefined && skipNextScrollRef?.current !== false) {
+      const savedScrollTop = skipNextScrollRef.current
+      skipNextScrollRef.current = false
+      if (typeof savedScrollTop === 'number') {
+        // Suppress flex-basis transition and scroll handler during restore
+        const wrapper = messagesContainerRef.current?.closest('.chat-messages-wrapper')
+        if (wrapper) wrapper.style.transition = 'none'
+        suppressScrollHandler.current = true
         setTimeout(() => {
           whenLayoutStable(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+            const el = messagesContainerRef.current
+            if (el) el.scrollTop = savedScrollTop
+            requestAnimationFrame(() => {
+              if (el) el.scrollTop = savedScrollTop
+              suppressScrollHandler.current = false
+              if (wrapper) wrapper.style.transition = ''
+            })
           })
         }, 50)
       }
+    } else if (!isNewThreadGettingId && threadIdChanged) {
+      setIsAtBottom(true)
+      setTimeout(() => {
+        whenLayoutStable(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        })
+      }, 50)
     }
   }, [currentThread?.id, currentThread?.messages?.length])
 
   // Auto-send: overlay pinned out with a pending API call.
   // The thread data has the user message — just call chatWithAI.
   // Delay 100ms to ensure thread-loading useEffect has populated apiMessages.
+  // Auto-send: overlay pinned out with a pending API call.
+  // Delay 100ms to ensure thread-loading useEffect has populated apiMessages.
   useEffect(() => {
     if (!autoSendPending) return
     const timer = setTimeout(async () => {
-      if (apiMessages.current.length === 0) { return }
+      if (apiMessages.current.length === 0) return
       onAutoSendConsumed?.()
       setIsLoading(true)
       setTimeout(() => scrollToRevealLoading(), 50)
-      const isFirstMessage = apiMessages.current.length === 1
+      const snapshot = createSendSnapshot()
       try {
         const result = await window.electronAPI.chatWithAI(getApiSafeMessages(), provider, modelId)
-        setIsLoading(false)
-        if (result.success) {
-          const assistantText = result.content.map(c => c.text || '').join('')
-          const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
-          apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
-          setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
-          if (!chatFullSize) setChatFullSize(true)
-          await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
-          scrollToLastAssistant()
-          const now = Date.now()
-          const thread = {
-            id: currentThread?.id || generateId(),
-            title: currentThread?.title || 'New Chat',
-            messages: [...apiMessages.current],
-            createdAt: currentThread?.createdAt || now,
-            updatedAt: now,
-          }
-          await saveCurrentThread(thread)
-          if (isFirstMessage) {
-            const titleMsgs = apiMessages.current.map(m => ({
-              ...m,
-              content: Array.isArray(m.content) ? m.content.filter(c => c.type !== 'image') : m.content,
-            }))
-            const title = await generateTitle(titleMsgs)
-            if (title) {
-              thread.title = title
-              await saveCurrentThread(thread)
-              setIsNewThread(false)
-            }
-          }
-        } else {
+        if (!result.success) {
+          setIsLoading(false)
           setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result.error || 'Unknown error'}` }])
+          return
         }
+        await handleAIResponse(result, snapshot)
       } catch (err) {
         setIsLoading(false)
         setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${err.message}` }])
       }
     }, 100)
     return () => clearTimeout(timer)
-  }, [autoSendPending, currentThread?.id])
+  }, [autoSendPending]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-focus input
   useEffect(() => {
@@ -407,13 +414,13 @@ export default function ChatPanel({
       // Send to AI without re-adding user message to UI
       setIsLoading(true)
       setTimeout(() => scrollToRevealLoading(), 50)
+      const snapshot = createSendSnapshot()
       ;(async () => {
         try {
           const result = await window.electronAPI.chatWithAI(getApiSafeMessages(), provider, modelId)
-          setIsLoading(false)
           if (!result?.success) {
+            setIsLoading(false)
             if (result?.code === 'auth_error' || result?.error?.includes('No API key')) {
-              // Re-save pending state so it retries after key setup
               pendingQuestion.current = q
               pendingImageRef.current = pendingImage
               pendingSnippetRef.current = pendingSnippet
@@ -424,38 +431,7 @@ export default function ChatPanel({
               setMessages(prev => [...prev, { role: 'assistant', text: `Error: ${result?.error || 'Something went wrong'}` }])
             }
           } else {
-            const assistantText = result.content.map(c => c.text || '').join('')
-            const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
-            apiMessages.current.push({ role: 'assistant', content: result.content, model: currentModelName })
-            // Add message, expand panel, then scroll to top of assistant response
-            setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
-            if (!chatFullSize) setChatFullSize(true)
-            await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
-            scrollToLastAssistant()
-
-            // Save thread + generate title
-            const now = Date.now()
-            const thread = {
-              id: currentThread?.id || generateId(),
-              title: currentThread?.title || 'New Chat',
-              messages: [...apiMessages.current],
-              createdAt: currentThread?.createdAt || now,
-              updatedAt: now,
-            }
-            await saveCurrentThread(thread)
-
-            const titleMsgs = apiMessages.current.map(m => ({
-              ...m,
-              content: Array.isArray(m.content)
-                ? m.content.filter(c => c.type !== 'image')
-                : m.content,
-            }))
-            const title = await generateTitle(titleMsgs)
-            if (title) {
-              thread.title = title
-              await saveCurrentThread(thread)
-              setIsNewThread(false)
-            }
+            await handleAIResponse(result, snapshot)
           }
         } catch (err) {
           setIsLoading(false)
@@ -492,6 +468,7 @@ export default function ChatPanel({
   const scrollDownBtnRef = useRef(null)
 
   const handleScroll = useCallback(() => {
+    if (suppressScrollHandler.current) return
     const el = messagesContainerRef.current
     if (!el) return
     const threshold = 30
@@ -639,9 +616,9 @@ export default function ChatPanel({
     })
   }, [whenLayoutStable])
 
-  const saveCurrentThread = useCallback(async (thread) => {
-    setCurrentThread(thread)
+  // (scroll-to-message is handled directly by ChatOnlyApp via DOM query)
 
+  const saveCurrentThread = useCallback(async (thread) => {
     // Save images to disk and replace base64 blocks with file references
     const savedMessages = await Promise.all(thread.messages.map(async (m, idx) => ({
       ...m,
@@ -659,11 +636,14 @@ export default function ChatPanel({
       })),
     })))
 
-    await window.electronAPI?.saveThread({ ...thread, messages: savedMessages })
+    const savedThread = { ...thread, messages: savedMessages }
+    await window.electronAPI?.saveThread(savedThread)
 
-    // apiMessages.current keeps file refs intact (source of truth for saving + display).
-    // File images are only stripped to [screenshot] at the point of chatWithAI() calls
-    // via getApiSafeMessages(). saveImage() is idempotent (overwrites same file).
+    // Update both currentThread and apiMessages with file refs so base64
+    // images are only saved to disk once. File images are stripped to
+    // [screenshot] only at the chatWithAI() call site via getApiSafeMessages().
+    setCurrentThread(savedThread)
+    apiMessages.current = savedMessages
 
     refreshThreads()
     window.electronAPI?.refreshTrayMenu?.()
@@ -677,6 +657,84 @@ export default function ChatPanel({
     } catch {}
     return null
   }, [provider, modelId])
+
+  // ── Shared helpers for all AI response paths ──
+
+  // Capture thread state before an await chatWithAI call.
+  // Returns an immutable snapshot that survives thread switches.
+  const createSendSnapshot = () => ({
+    sendThreadId: currentThread?.id || generateId(),
+    snapshotMessages: apiMessages.current.map(m => ({
+      ...m,
+      content: (m.content || []).map(c =>
+        c.source ? { ...c, source: { ...c.source } } : { ...c }
+      ),
+    })),
+    snapshotTitle: currentThread?.title || 'New Chat',
+    snapshotCreatedAt: currentThread?.createdAt || Date.now(),
+    isFirstMessage: apiMessages.current.length === 1,
+  })
+
+  // Handle AI response after chatWithAI returns. Used by sendMessage,
+  // auto-send, and welcome-resend. Handles thread-switch detection,
+  // message persistence, title generation, and UI updates.
+  // Returns { switched: true } if thread changed during the await.
+  const handleAIResponse = async (result, snapshot) => {
+    const { sendThreadId, snapshotMessages, snapshotTitle, snapshotCreatedAt, isFirstMessage } = snapshot
+    const switched = currentThreadIdRef.current !== sendThreadId
+
+    setIsLoading(false)
+
+    if (!result.success) return { switched, saved: false }
+
+    const assistantText = result.content.map(c => c.text || '').join('')
+    const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
+    const assistantApiMsg = { role: 'assistant', content: result.content, model: currentModelName }
+
+    if (switched) {
+      // Thread changed — save snapshot + response, navigate back
+      snapshotMessages.push(assistantApiMsg)
+      forceReloadRef.current = true
+      const thread = {
+        id: sendThreadId, title: snapshotTitle,
+        messages: snapshotMessages,
+        createdAt: snapshotCreatedAt, updatedAt: Date.now(),
+      }
+      await saveCurrentThread(thread)
+      if (isFirstMessage) {
+        const title = await generateTitle(snapshotMessages.map(m => ({
+          ...m, content: Array.isArray(m.content) ? m.content.filter(c => c.type !== 'image') : m.content,
+        })))
+        if (title) { thread.title = title; await saveCurrentThread(thread) }
+      }
+      setIsNewThread(false)
+    } else {
+      // Same thread — update UI and save
+      apiMessages.current.push(assistantApiMsg)
+      setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
+      if (!chatFullSize) setChatFullSize(true)
+      await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
+      scrollToLastAssistant()
+      const thread = {
+        id: sendThreadId, title: snapshotTitle,
+        messages: [...apiMessages.current],
+        createdAt: snapshotCreatedAt, updatedAt: Date.now(),
+      }
+      await saveCurrentThread(thread)
+      if (isFirstMessage) {
+        const titleMsgs = apiMessages.current.map(m => ({
+          ...m, content: Array.isArray(m.content) ? m.content.filter(c => c.type !== 'image') : m.content,
+        }))
+        const title = await generateTitle(titleMsgs)
+        if (title) {
+          thread.title = title
+          await saveCurrentThread(thread)
+          setIsNewThread(false)
+        }
+      }
+    }
+    return { switched, saved: true }
+  }
 
   const sendMessage = async (overrideText) => {
     const text = (overrideText || input).trim()
@@ -781,53 +839,16 @@ export default function ChatPanel({
       }
     }
 
-    const isFirstMessage = apiMessages.current.length === 1
+    const snapshot = createSendSnapshot()
 
     try {
       const result = await window.electronAPI.chatWithAI(getApiSafeMessages(), provider, modelId)
 
-      // Hide loading dots before adding the response
-      setIsLoading(false)
-
       if (result.success) {
-        const assistantText = result.content.map(c => c.text || '').join('')
-        const currentModelName = availableProviders.flatMap(p => p.models || []).find(m => m.id === modelId)?.name || ''
-        const assistantApiMsg = { role: 'assistant', content: result.content, model: currentModelName }
-        apiMessages.current.push(assistantApiMsg)
-        // Add message, expand panel, then scroll to top of assistant response
-        setMessages(prev => [...prev, { role: 'assistant', text: assistantText, model: currentModelName }])
-        if (!chatFullSize) setChatFullSize(true)
-        await window.electronAPI?.resizeChatWindow?.({ width: 380, height: 550 })
-        scrollToLastAssistant()
-
-        const now = Date.now()
-        const thread = {
-          id: currentThread?.id || generateId(),
-          title: currentThread?.title || 'New Chat',
-          messages: [...apiMessages.current],
-          createdAt: currentThread?.createdAt || now,
-          updatedAt: now,
-        }
-        await saveCurrentThread(thread)
-
-        if (isFirstMessage) {
-          // Strip images to save tokens for title generation
-          const titleMsgs = apiMessages.current.map(m => ({
-            ...m,
-            content: Array.isArray(m.content)
-              ? m.content.filter(c => c.type !== 'image')
-              : m.content,
-          }))
-          const title = await generateTitle(titleMsgs)
-          if (title) {
-            thread.title = title
-            await saveCurrentThread(thread)
-            setIsNewThread(false)
-          }
-        }
+        await handleAIResponse(result, snapshot)
       } else {
+        setIsLoading(false)
         if (result.code === 'auth_error' || result.error?.includes('No API key')) {
-          // Save pending state so message auto-sends after key setup
           const lastUserMsg = apiMessages.current[apiMessages.current.length - 1]
           if (lastUserMsg?.role === 'user') {
             const textBlock = (lastUserMsg.content || []).find(c => c.type === 'text')
@@ -843,9 +864,9 @@ export default function ChatPanel({
         }
       }
     } catch (err) {
+      setIsLoading(false)
       const msg = typeof err === 'string' ? err : (err.message || 'Something went wrong')
       if (msg.includes('API key') || msg.includes('api key') || msg.includes('not found')) {
-        // Save pending state so message auto-sends after key setup
         const lastUserMsg = apiMessages.current[apiMessages.current.length - 1]
         if (lastUserMsg?.role === 'user') {
           const textBlock = (lastUserMsg.content || []).find(c => c.type === 'text')
@@ -998,10 +1019,17 @@ export default function ChatPanel({
       {/* Header — drag handle */}
       <div ref={headerRef} className="chat-header" onMouseDown={handleHeaderMouseDown} {...(chatFullSize ? {'data-tauri-drag-region': ''} : {})}>
         <span
-            className={`glimpse-icon-fixed chat-header-eye ${eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-single-blink' : ''}`}
+            className={`glimpse-icon-fixed ${boardActive ? '' : `chat-header-eye ${eyeAnim === 'draw' ? 'logo-draw-only' : eyebrowWiggle ? 'logo-single-blink' : ''}`}`}
+            onMouseDown={(e) => { e.currentTarget._dragStart = { x: e.screenX, y: e.screenY } }}
             onClick={(e) => {
               e.stopPropagation()
-              if (!isLoading && !eyeAnim) {
+              const start = e.currentTarget._dragStart
+              if (start && (Math.abs(e.screenX - start.x) > 4 || Math.abs(e.screenY - start.y) > 4)) return
+              if (chatFullSize && onToggleBoard) {
+                onToggleBoard()
+                return
+              }
+              if (!boardActive && !isLoading && !eyeAnim) {
                 setEyebrowWiggle(false)
                 void e.currentTarget.offsetWidth
                 setEyebrowWiggle(true)
@@ -1010,7 +1038,7 @@ export default function ChatPanel({
             }}
             style={{ cursor: 'pointer' }}
           >
-            <GlimpseIcon size={24} focused={isPinned} />
+            {boardActive ? <BoardIcon size={24} /> : <GlimpseIcon size={26} focused={isPinned} />}
           </span>
         <div className="chat-header-info" style={{ position: 'relative' }}>
           <button
@@ -1030,15 +1058,19 @@ export default function ChatPanel({
               <div className="thread-menu-popup header-popup" role="menu" aria-label="Thread history">
                 {recentThreads.filter(t => t.id !== currentThread?.id).length > 0 ? (
                   <>
-                    {recentThreads.filter(t => t.id !== currentThread?.id).map(t => (
+                    {recentThreads.filter(t => t.id !== currentThread?.id).slice(0, 5).map(t => (
                       <button key={t.id} className="thread-menu-item" role="menuitem" onClick={() => { onThreadChange(t); setThreadMenuOpen(false); triggerTitleAnim() }} title={t.title}>
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                         <span>{t.title}</span>
                       </button>
                     ))}
                     <div className="thread-menu-divider" />
-                    <button className="thread-menu-item thread-menu-clear" role="menuitem" onClick={() => { onClearAllThreads(); setThreadMenuOpen(false) }}>
-                      <span>Clear all chats</span>
+                    <button className="thread-menu-item thread-menu-view-all" role="menuitem" onClick={() => { onViewAllChats?.(); setThreadMenuOpen(false) }}>
+                      <svg viewBox="0 0 100 100" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="5">
+                        <rect x="8" y="8" width="38" height="38" rx="6" /><rect x="54" y="8" width="38" height="38" rx="6" />
+                        <rect x="8" y="54" width="38" height="38" rx="6" /><rect x="54" y="54" width="38" height="38" rx="6" />
+                      </svg>
+                      <span>View all chats</span>
                     </button>
                   </>
                 ) : (
@@ -1089,7 +1121,7 @@ export default function ChatPanel({
       {isPinned && (
         <div ref={headerIconsRef} className="view-mode-header-icons" style={{ display: 'none' }}>
           <span className="glimpse-icon-fixed chat-header-eye">
-            <GlimpseIcon size={24} focused={true} />
+            <GlimpseIcon size={26} focused={true} />
           </span>
           {(onTogglePin || onPin) && (
             <button
@@ -1156,6 +1188,7 @@ export default function ChatPanel({
                   <div
                     key={i}
                     className={`chat-msg ${msg.role}`}
+                    data-msg-index={i}
                     ref={isLastAssistant ? lastAssistantRef : null}
                   >
                     {msg.role === 'assistant' ? (
@@ -1258,16 +1291,19 @@ export default function ChatPanel({
                             className="msg-image msg-image-clickable"
                             onClick={() => {
                               // Collect all images in thread for arrow-key navigation
-                              const allImages = messages.filter(m => m.image).map(m => ({
+                              const imageMessages = messages.map((m, idx) => ({ m, idx })).filter(({ m }) => m.image)
+                              const allImages = imageMessages.map(({ m }) => ({
                                 path: m.imagePath || null,
                                 dataUrl: (!m.imagePath && m.image) ? m.image : null
                               }))
-                              const currentIndex = messages.filter(m => m.image).findIndex(m => m === msg)
+                              const messageIndices = imageMessages.map(({ idx }) => idx)
+                              const currentIndex = imageMessages.findIndex(({ m }) => m === msg)
                               window.electronAPI?.showImageViewer?.(
                                 msg.imagePath || null,
                                 (!msg.imagePath && msg.image) ? msg.image : null,
                                 allImages,
-                                currentIndex
+                                currentIndex,
+                                messageIndices
                               )
                             }}
                           />
@@ -1335,11 +1371,7 @@ export default function ChatPanel({
               <span>Screenshot attached</span>
               {onDismissScreenshot && (
                 <button className="attachment-dismiss" onClick={() => {
-                  const el = messagesContainerRef.current
-                  const prevTop = el?.scrollTop
                   onDismissScreenshot()
-                  // Restore scroll position after attachment cue removal shrinks input area
-                  if (el && prevTop != null) requestAnimationFrame(() => { el.scrollTop = prevTop })
                   setTimeout(() => inputRef.current?.focus(), 50)
                 }} aria-label="Remove screenshot">×</button>
               )}
